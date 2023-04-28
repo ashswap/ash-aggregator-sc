@@ -1,0 +1,31 @@
+stages:
+  - test
+  - build
+
+test:
+  stage: test
+  image: registry.gitlab.com/trancport/blockchain/ashswap/ash-aggregator-sc:base
+  tags:
+    - rust
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+    GIT_STRATEGY: clone
+  script:
+    - sh -c "./scripts/test.sh"
+  only:
+   - develop
+   - main
+
+build:
+  stage: build
+  image: registry.gitlab.com/trancport/blockchain/ashswap/ash-aggregator-sc:base
+  tags:
+    - rust
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+    GIT_STRATEGY: clone
+  script:
+    - sh -c "./scripts/build.sh"
+  only:
+   - develop
+   - main

@@ -1,0 +1,25 @@
+[package]
+name = "dex-tests"
+version = "0.0.0"
+authors = ["Bicarus <hello@bicarus.io>"]
+edition = "2021"
+publish = false
+
+[dev-dependencies]
+num-bigint = "0.4.2"
+
+[dependencies.multiversx-sc]
+version = "0.40.0"
+features = ["esdt-token-payment-legacy-decode"]
+
+[dev-dependencies.multiversx-sc-scenario]
+version = "0.40.0"
+
+[dev-dependencies.aggregator]
+path = "aggregator"
+
+[dev-dependencies.common-errors]
+path = "../common/errors"
+
+[dev-dependencies.common-structs]
+path = "../common/structs"

@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "dex",
+    "dex/aggregator",
+    "dex/aggregator/meta",
+]

@@ -1,0 +1,12 @@
+[package]
+name = "common-errors"
+version = "0.0.0"
+authors = ["Bicarus <hello@bicarus.io>"]
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies.multiversx-sc]
+version = "0.40.0"
+features = ["esdt-token-payment-legacy-decode"]
