@@ -4,5 +4,8 @@
         "aggregator-deploy-tx": "f190ae3fe1272d09872629823bd575141bce09c44223ee2cc65e825e80334c50"
     },
     "D": {},
-    "1": {}
+    "1": {
+        "aggregator-address": "erd1qqqqqqqqqqqqqpgqa0aayq3y9dgfer36jt570w6nvxrmwp3a4fvsrf80zn",
+        "aggregator-deploy-tx": "8f48302c3c58d5c7ec765aa05692305fc2fafdfb29681c2b804036a203d2b87b"
+    }
 }
