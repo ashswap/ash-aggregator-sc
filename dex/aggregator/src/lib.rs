@@ -5,6 +5,13 @@ multiversx_sc::derive_imports!();
 
 use common_errors::*;
 use common_structs::*;
+use core::ops::Deref;
+
+#[derive(TypeAbi, TopEncode)]
+pub struct AggregatorEvent<M: ManagedTypeApi> {
+    payment_in: ManagedVec<M, EsdtTokenPayment<M>>,
+    payment_out: ManagedVec<M, EsdtTokenPayment<M>>,
+}
 
 #[multiversx_sc::contract]
 pub trait AggregatorContract: token_send::TokenSendModule {
@@ -69,7 +76,7 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         }
 
         let limits = limits.to_vec();
-        let mut payments = ManagedVec::new();
+        let mut results = ManagedVec::new();
         for step in steps.into_iter() {
             self._exchange(&mut vaults, step);
         }
@@ -80,9 +87,19 @@ pub trait AggregatorContract: token_send::TokenSendModule {
             if let Some(index) = index_opt { limit_amount = limits.get(index).amount; }
 
             require!(vault.amount >= limit_amount, ERROR_SLIPPAGE_SCREW_YOU);
-            payments.push(EsdtTokenPayment::new(vault.token, 0, vault.amount));
+            results.push(EsdtTokenPayment::new(vault.token, 0, vault.amount));
         }
 
-        self.send_multiple_tokens_if_not_zero(&self.blockchain().get_caller(), &payments)
+        let caller = self.blockchain().get_caller();
+        let payment_out = self.send_multiple_tokens_if_not_zero(&caller, &results);
+        self.aggregate_event(&caller, AggregatorEvent { payment_in: payments.deref().clone(), payment_out: payment_out.clone() });
+        payment_out
     }
+
+    #[event("aggregate_event")]
+    fn aggregate_event(
+        &self,
+        #[indexed] caller: &ManagedAddress,
+        aggregate: AggregatorEvent<Self::Api>,
+    );
 }
