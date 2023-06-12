@@ -52,6 +52,7 @@ pub trait AggregatorContract: token_send::TokenSendModule {
 
         let amount_after = self.blockchain().get_esdt_balance(&sc_address, &step.token_out, 0);
         let mut amount_out = amount_after - amount_before;
+        require!(amount_out > 0, ERROR_ZERO_AMOUNT);
 
         let index_out_opt = self._find_token_in_vec(vaults, &step.token_out);
         if let Some(index_out) = index_out_opt {
