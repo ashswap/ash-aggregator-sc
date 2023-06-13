@@ -25,6 +25,14 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         None
     }
 
+    fn _upsert_vaults(&self, vaults: &mut ManagedVec<TokenAmount<Self::Api>>, token_id: &TokenIdentifier, amount: BigUint) {
+        let index_opt = self._find_token_in_vec(vaults, token_id);
+        if let Some(index) = index_opt {
+            let total_amount = vaults.get(index).amount + amount;
+            _ = vaults.set(index, &TokenAmount::new(token_id.clone(), total_amount));
+        } else { vaults.push(TokenAmount::new(token_id.clone(), amount)); }
+    }
+
     fn _exchange(&self, vaults: &mut ManagedVec<TokenAmount<Self::Api>>, step: AggregatorStep<Self::Api>) {
         let index_in_opt = self._find_token_in_vec(vaults, &step.token_in);
         require!(index_in_opt.is_some(), ERROR_INVALID_TOKEN_IN);
@@ -34,8 +42,11 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         if step.amount_in > 0u64 {
             require!(amount_in >= step.amount_in, ERROR_INVALID_AMOUNT_IN);
             let remaining_amount = &amount_in - &step.amount_in;
-            _ = vaults.set(index_in, &TokenAmount::new(step.token_in.clone(), remaining_amount));
             amount_in = step.amount_in;
+
+            if remaining_amount > 0 {
+                _ = vaults.set(index_in, &TokenAmount::new(step.token_in.clone(), remaining_amount));
+            } else { vaults.remove(index_in); }
         } else { vaults.remove(index_in); }
 
         let mut payments = ManagedVec::new();
@@ -51,16 +62,9 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         let _: IgnoreValue = contract_call.with_multi_token_transfer(payments).execute_on_dest_context();
 
         let amount_after = self.blockchain().get_esdt_balance(&sc_address, &step.token_out, 0);
-        let mut amount_out = amount_after - amount_before;
+        let amount_out = amount_after - amount_before;
         require!(amount_out > 0, ERROR_ZERO_AMOUNT);
-
-        let index_out_opt = self._find_token_in_vec(vaults, &step.token_out);
-        if let Some(index_out) = index_out_opt {
-            amount_out += vaults.get(index_out).amount;
-            _ = vaults.set(index_out, &TokenAmount::new(step.token_out, amount_out));
-        } else {
-            vaults.push(TokenAmount::new(step.token_out, amount_out));
-        }
+        self._upsert_vaults(vaults, &step.token_out, amount_out);
     }
 
     #[payable("*")]
@@ -73,21 +77,25 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         for payment in payments.into_iter() {
             require!(payment.token_nonce == 0, ERROR_ZERO_TOKEN_NONCE);
             require!(payment.amount > 0u64, ERROR_ZERO_AMOUNT);
-            vaults.push(TokenAmount::new(payment.token_identifier, payment.amount));
+            self._upsert_vaults(&mut vaults, &payment.token_identifier, payment.amount);
         }
 
         let limits = limits.to_vec();
         let mut results = ManagedVec::new();
+        let sc_address = self.blockchain().get_sc_address();
+
         for step in steps.into_iter() {
+            require!(step.pool_address != sc_address, ERROR_INVALID_POOL_ADDR);
             self._exchange(&mut vaults, step);
         }
 
+        require!(vaults.len() == limits.len(), ERROR_OUTPUT_LEN_MISMATCH);
         for vault in vaults.into_iter() {
-            let mut limit_amount = BigUint::zero();
             let index_opt = self._find_token_in_vec(&limits, &vault.token);
-            if let Some(index) = index_opt { limit_amount = limits.get(index).amount; }
+            require!(index_opt.is_some(), ERROR_INVALID_TOKEN_IN);
+            let index = index_opt.unwrap();
 
-            require!(vault.amount >= limit_amount, ERROR_SLIPPAGE_SCREW_YOU);
+            require!(vault.amount >= limits.get(index).amount, ERROR_SLIPPAGE_SCREW_YOU);
             results.push(EsdtTokenPayment::new(vault.token, 0, vault.amount));
         }
 
