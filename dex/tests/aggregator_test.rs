@@ -164,6 +164,11 @@ fn test_aggregate_simple() {
         pool_address: mock_address.clone(),
     }];
 
+    let test_limits = vec![TestTokenAmount {
+        token: BUSD_TOKEN_ID.to_vec(),
+        amount: rust_biguint!(0),
+    }];
+
     let payments = vec![TxTokenTransfer {
         token_identifier: USDC_TOKEN_ID.to_vec(),
         nonce: 0,
@@ -185,7 +190,7 @@ fn test_aggregate_simple() {
         },
     ];
 
-    aggregate(&mut agg_setup, test_steps, vec![], payments).assert_ok();
+    aggregate(&mut agg_setup, test_steps, test_limits, payments).assert_ok();
     check_result(&mut agg_setup, expected_balances);
 }
 
@@ -279,6 +284,11 @@ fn test_aggregate_multi() {
         },
     ];
 
+    let test_limits = vec![TestTokenAmount {
+        token: BUSD_TOKEN_ID.to_vec(),
+        amount: rust_biguint!(0),
+    }];
+
     let payments = vec![TxTokenTransfer {
         token_identifier: USDC_TOKEN_ID.to_vec(),
         nonce: 0,
@@ -301,6 +311,6 @@ fn test_aggregate_multi() {
         },
     ];
 
-    aggregate(&mut agg_setup, test_steps, vec![], payments).assert_ok();
+    aggregate(&mut agg_setup, test_steps, test_limits, payments).assert_ok();
     check_result(&mut agg_setup, expected_balances);
 }
