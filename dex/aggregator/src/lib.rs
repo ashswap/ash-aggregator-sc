@@ -18,7 +18,7 @@ pub trait AggregatorContract: token_send::TokenSendModule {
     #[init]
     fn init(&self) {}
 
-    fn _find_token_in_vec(&self, tokens: &ManagedVec<TokenAmount<Self::Api>>, token_id: &TokenIdentifier) -> Option<usize> {
+    fn _find_token_in_vault(&self, tokens: &ManagedVec<TokenAmount<Self::Api>>, token_id: &TokenIdentifier) -> Option<usize> {
         for (index, token) in tokens.into_iter().enumerate() {
             if token_id == &token.token { return Some(index); }
         }
@@ -26,7 +26,7 @@ pub trait AggregatorContract: token_send::TokenSendModule {
     }
 
     fn _upsert_vaults(&self, vaults: &mut ManagedVec<TokenAmount<Self::Api>>, token_id: &TokenIdentifier, amount: BigUint) {
-        let index_opt = self._find_token_in_vec(vaults, token_id);
+        let index_opt = self._find_token_in_vault(vaults, token_id);
         if let Some(index) = index_opt {
             let total_amount = vaults.get(index).amount + amount;
             _ = vaults.set(index, &TokenAmount::new(token_id.clone(), total_amount));
@@ -34,7 +34,7 @@ pub trait AggregatorContract: token_send::TokenSendModule {
     }
 
     fn _exchange(&self, vaults: &mut ManagedVec<TokenAmount<Self::Api>>, step: AggregatorStep<Self::Api>) {
-        let index_in_opt = self._find_token_in_vec(vaults, &step.token_in);
+        let index_in_opt = self._find_token_in_vault(vaults, &step.token_in);
         require!(index_in_opt.is_some(), ERROR_INVALID_TOKEN_IN);
         let index_in = index_in_opt.unwrap();
 
@@ -42,12 +42,9 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         if step.amount_in > 0u64 {
             require!(amount_in >= step.amount_in, ERROR_INVALID_AMOUNT_IN);
             let remaining_amount = &amount_in - &step.amount_in;
+            _ = vaults.set(index_in, &TokenAmount::new(step.token_in.clone(), remaining_amount));
             amount_in = step.amount_in;
-
-            if remaining_amount > 0 {
-                _ = vaults.set(index_in, &TokenAmount::new(step.token_in.clone(), remaining_amount));
-            } else { vaults.remove(index_in); }
-        } else { vaults.remove(index_in); }
+        } else { _ = vaults.set(index_in, &TokenAmount::new(step.token_in.clone(), BigUint::zero())); }
 
         let mut payments = ManagedVec::new();
         payments.push(EsdtTokenPayment::new(step.token_in, 0, amount_in));
@@ -90,13 +87,17 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         }
 
         require!(vaults.len() == limits.len(), ERROR_OUTPUT_LEN_MISMATCH);
-        for vault in vaults.into_iter() {
-            let index_opt = self._find_token_in_vec(&limits, &vault.token);
+        for limit in limits.into_iter() {
+            let index_opt = self._find_token_in_vault(&vaults, &limit.token);
             require!(index_opt.is_some(), ERROR_INVALID_TOKEN_IN);
             let index = index_opt.unwrap();
 
-            require!(vault.amount >= limits.get(index).amount, ERROR_SLIPPAGE_SCREW_YOU);
+            let vault = vaults.get(index);
+            require!(vault.amount >= limit.amount, ERROR_SLIPPAGE_SCREW_YOU);
             results.push(EsdtTokenPayment::new(vault.token, 0, vault.amount));
+
+            // remove index from vaults for de-duplicate limits
+            vaults.remove(index);
         }
 
         let caller = self.blockchain().get_caller();
