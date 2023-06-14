@@ -164,10 +164,16 @@ fn test_aggregate_simple() {
         pool_address: mock_address.clone(),
     }];
 
-    let test_limits = vec![TestTokenAmount {
-        token: BUSD_TOKEN_ID.to_vec(),
-        amount: rust_biguint!(0),
-    }];
+    let test_limits = vec![
+        TestTokenAmount {
+            token: USDC_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(0),
+        },
+        TestTokenAmount {
+            token: BUSD_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(0),
+        },
+    ];
 
     let payments = vec![TxTokenTransfer {
         token_identifier: USDC_TOKEN_ID.to_vec(),
@@ -242,10 +248,16 @@ fn test_aggregate_error() {
         pool_address: mock_address.clone(),
     }];
 
-    let test_limits = vec![TestTokenAmount {
-        token: BUSD_TOKEN_ID.to_vec(),
-        amount: rust_biguint!(amount),
-    }];
+    let test_limits = vec![
+        TestTokenAmount {
+            token: USDC_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(amount),
+        },
+        TestTokenAmount {
+            token: BUSD_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(amount),
+        },
+    ];
 
     let payments = vec![TxTokenTransfer {
         token_identifier: USDC_TOKEN_ID.to_vec(),
@@ -284,10 +296,20 @@ fn test_aggregate_multi() {
         },
     ];
 
-    let test_limits = vec![TestTokenAmount {
-        token: BUSD_TOKEN_ID.to_vec(),
-        amount: rust_biguint!(0),
-    }];
+    let test_limits = vec![
+        TestTokenAmount {
+            token: USDC_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(0),
+        },
+        TestTokenAmount {
+            token: USDT_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(0),
+        },
+        TestTokenAmount {
+            token: BUSD_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(0),
+        },
+    ];
 
     let payments = vec![TxTokenTransfer {
         token_identifier: USDC_TOKEN_ID.to_vec(),
