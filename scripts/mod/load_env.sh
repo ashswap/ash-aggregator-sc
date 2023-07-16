@@ -28,7 +28,7 @@ load() {
 
     load_utils
     load_args
-    update_contract_arg
+    # update_contract_arg
     load_deployed_data
 }
 
@@ -61,7 +61,7 @@ use_devnet() {
 
 use_mainnet() {
     CHAIN_ID="1"
-    WALLET_PEM="../../wallet/mainnet/ash-deployer-main.pem"
+    WALLET_PEM="../../wallet/mainnet/ash-main.pem"
     PROXY="https://gateway.multiversx.com"
     EXPLORER="https://explorer.multiversx.com"
 
