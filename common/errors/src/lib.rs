@@ -10,3 +10,5 @@ pub const ERROR_INVALID_TOKEN_IN: &str = "Invalid token in";
 
 pub const ERROR_OUTPUT_LEN_MISMATCH: &str = "Output length mismatch";
 pub const ERROR_INVALID_POOL_ADDR: &str = "Invalid pool address";
+
+pub const ERROR_PROTOCOL_NOT_REGISTED: &str = "Protocol hasn't registered";

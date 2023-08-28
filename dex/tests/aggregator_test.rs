@@ -1,7 +1,7 @@
 use aggregator::*;
 use common_errors::*;
 use common_structs::*;
-use multiversx_sc::types::*;
+use multiversx_sc::{types::*, codec::multi_types::OptionalValue};
 use multiversx_sc_scenario::{testing_framework::*, *};
 
 pub mod protocol_mock;
@@ -138,7 +138,7 @@ where
                 });
             }
 
-            let mut limits = MultiValueEncoded::new();
+            let mut limits = ManagedVec::new();
             for limit in test_limits {
                 limits.push(TokenAmount {
                     token: managed_token_id!(limit.token),
@@ -146,7 +146,7 @@ where
                 });
             }
 
-            sc.aggregate(steps, limits);
+            sc.aggregate(steps, limits, OptionalValue::None);
         },
     )
 }

@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                            1
+// Endpoints:                            7
 // Async Callback (empty):               1
-// Total number of exported functions:   3
+// Total number of exported functions:   9
 
 #![no_std]
 #![feature(alloc_error_handler, lang_items)]
@@ -19,6 +19,12 @@ multiversx_sc_wasm_adapter::endpoints! {
     aggregator
     (
         aggregate
+        registerProtocolFee
+        registerAshswapFee
+        getProtocolFeePercent
+        getAshswapFeePercent
+        claim
+        ashswap_claim
     )
 }
 
