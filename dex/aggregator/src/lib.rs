@@ -81,55 +81,31 @@ pub trait AggregatorContract: token_send::TokenSendModule {
             self._upsert_vaults(&mut vaults, &payment.token_identifier, payment.amount);
         }
 
-        let is_charge_fee = protocol.is_some();
-        let fee_percent: u64;
-        let ashswap_percent: u64;
-        let protocol_addr = match protocol {
+        match protocol {
             OptionalValue::Some(protocol_addr) => {
                 require!(self.protocol_fee().contains_key(&protocol_addr), ERROR_PROTOCOL_NOT_REGISTED);
-                fee_percent = self.protocol_fee_percent(protocol_addr.clone()).get();
-                ashswap_percent = self.ashswap_fee_percent().get();
-                protocol_addr
+                let fee_percent = self.protocol_fee_percent(protocol_addr.clone()).get();
+                let ashswap_percent = self.ashswap_fee_percent().get();
+                // loop over vaults to subtract fee
+                for index in 0..vaults.len() {
+                    let vault = vaults.get(index).clone();
+                    let total_fee = vault.amount.clone() * fee_percent.clone() / MAX_FEE_PERCENT;
+                    let ashswap_fee = &total_fee * ashswap_percent.clone() / MAX_FEE_PERCENT;
+                    let protocol_fee = &total_fee - &ashswap_fee;
+                    // key has already imported at this step due to previous require
+                    // protocol fee
+                    let mut map_token_fee_amount = self.protocol_fee().get(&protocol_addr).unwrap();
+                    let fee_amount = map_token_fee_amount.get(&vault.token).unwrap_or_else(|| {BigUint::zero()});
+                    map_token_fee_amount.insert(vault.token.clone(), fee_amount + protocol_fee);
+
+                    let fee_amount = self.ashswap_fee().get(&vault.token).unwrap_or_else(|| {BigUint::zero()});
+                    self.ashswap_fee().insert(vault.token.clone(), fee_amount + ashswap_fee);
+
+                    _ = vaults.set(index, &TokenAmount::new(vault.token, vault.amount - total_fee));
+                } 
             },
-            OptionalValue::None => {
-                fee_percent = 0u64;
-                ashswap_percent = 0u64;
-                ManagedAddress::zero()
-            },
+            OptionalValue::None => {},
         };
-
-        if is_charge_fee {
-           // loop over vaults to subtract fee
-            for index in 0..vaults.len() {
-                let vault = vaults.get(index).clone();
-                let total_fee = vault.amount.clone() * fee_percent.clone() / MAX_FEE_PERCENT;
-                let ashswap_fee = &total_fee * ashswap_percent.clone() / MAX_FEE_PERCENT;
-                let protocol_fee = &total_fee - &ashswap_fee;
-                // key has already imported at this step due to previous require
-                // protocol fee
-                let mut map_token_fee_amount = self.protocol_fee().get(&protocol_addr).unwrap();
-                match map_token_fee_amount.get(&vault.token) {
-                    Some(fee_amount) => {
-                        _ = map_token_fee_amount.insert(vault.token.clone(), fee_amount + protocol_fee);
-                    },
-                    None => {
-                        _ = map_token_fee_amount.insert(vault.token.clone(), protocol_fee.clone());
-                    },
-                }
-                // ashswap fee
-                match self.ashswap_fee().get(&vault.token) {
-                    Some(fee_amount) => {
-                        _ = self.ashswap_fee().insert(vault.token.clone(), fee_amount + ashswap_fee);
-                    },
-                    None => {
-                        _ = self.ashswap_fee().insert(vault.token.clone(), ashswap_fee.clone());
-                    },
-                }
-                _ = vaults.set(index, &TokenAmount::new(vault.token, vault.amount - total_fee));
-            } 
-        }
-        
-
 
         let mut results = ManagedVec::new();
         let sc_address = self.blockchain().get_sc_address();
@@ -172,6 +148,8 @@ pub trait AggregatorContract: token_send::TokenSendModule {
     #[only_owner]
     #[endpoint(registerProtocolFee)]
     fn register_protocol_fee(&self, fee_percent: u64, whitelist_address: ManagedAddress) {
+        require!(fee_percent <= MAX_FEE_PERCENT, ERROR_INVALID_FEE_PERCENT);
+        require!(!whitelist_address.is_zero(), ERROR_INVALID_ADDRESS);
         self.protocol_fee_percent(whitelist_address.clone()).set(fee_percent);
         self.protocol_fee().insert_default(whitelist_address);
     }
@@ -185,6 +163,8 @@ pub trait AggregatorContract: token_send::TokenSendModule {
     #[only_owner]
     #[endpoint(registerAshswapFee)]
     fn register_ashswap_fee(&self, fee_percent: u64, whitelist_address: ManagedAddress) {
+        require!(fee_percent <= MAX_FEE_PERCENT, ERROR_INVALID_FEE_PERCENT);
+        require!(!whitelist_address.is_zero(), ERROR_INVALID_ADDRESS);
         self.ashswap_fee_percent().set(fee_percent);
         self.ashswap_fee_address().set(whitelist_address);
     }
