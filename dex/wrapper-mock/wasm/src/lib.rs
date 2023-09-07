@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           13
+// Endpoints:                            3
 // Async Callback (empty):               1
-// Total number of exported functions:  15
+// Total number of exported functions:   5
 
 #![no_std]
 #![feature(alloc_error_handler, lang_items)]
@@ -16,21 +16,11 @@ multiversx_sc_wasm_adapter::allocator!();
 multiversx_sc_wasm_adapter::panic_handler!();
 
 multiversx_sc_wasm_adapter::endpoints! {
-    aggregator
+    wrapper_mock
     (
-        aggregate_v2
-        aggregate
-        getClaimabeProtocolFee
-        registerProtocolFee
-        getClaimabeAshswapFee
-        getAshswapFeeAddress
-        registerAshswapFee
-        getProtocolFeePercent
-        getAshswapFeePercent
-        claimProtocolFee
-        claimAshswapFee
-        getEgldWrapperAddress
-        getEgldWrappedTokenId
+        wrapEgld
+        unwrapEgld
+        getWrappedEgldTokenId
     )
 }
 

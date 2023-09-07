@@ -1,5 +1,7 @@
 #![no_std]
 
+pub mod proxy;
+
 multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
 
@@ -11,30 +13,32 @@ pub struct EgldWrapperOption<M: ManagedTypeApi> {
 
 #[multiversx_sc::module]
 pub trait TokenSendModule {
-    fn send_multiple_tokens_if_not_zero(&self, destination: &ManagedAddress, payments: &ManagedVec<EsdtTokenPayment>, egld_wrap_opt: OptionalValue<EgldWrapperOption<Self::Api>>) -> ManagedVec<EsdtTokenPayment> {
+    fn send_multiple_tokens_if_not_zero_support_egld(&self, destination: &ManagedAddress, payments: &ManagedVec<EsdtTokenPayment>) -> (ManagedVec<EsdtTokenPayment>, EsdtTokenPayment) {
         let mut non_zero_payments = ManagedVec::new();
-        let mut egld_payment_amount = BigUint::from(0u64);
-        match egld_wrap_opt {
-            OptionalValue::Some(egld_wrap_opt) => {
-                for payment in payments {
-                    if payment.amount > 0u64 {
-                        if egld_wrap_opt.egld_return && payment.token_identifier == egld_wrap_opt.wrapped_egld_token_id {
-                            egld_payment_amount += payment.amount;
-                        } else {
-                            non_zero_payments.push(payment);
-                        }
-                    }
+        let wrapped_egld_token_id = self.egld_wrapped_token_id().get();
+        let mut unwrap_egld_payment = EsdtTokenPayment::new(wrapped_egld_token_id.clone(), 0, 0u64.into());
+        for payment in payments {
+            if payment.amount > 0u64 {
+                if payment.token_identifier == wrapped_egld_token_id {
+                    unwrap_egld_payment.amount += payment.amount;
+                } else {
+                    non_zero_payments.push(payment);
                 }
-            },
-            OptionalValue::None => {
-                for payment in payments {
-                    if payment.amount > 0u64 {
-                        non_zero_payments.push(payment);
-                    }
-                }
-            },
+            }
+        }
+        if !non_zero_payments.is_empty() {
+            self.send().direct_multi(destination, &non_zero_payments);
+        }
+        if unwrap_egld_payment.amount > 0u64 {
+            self.unwrap_egld(unwrap_egld_payment.clone());
+            self.send().direct_egld(destination, &unwrap_egld_payment.amount);
         }
         
+        (non_zero_payments, unwrap_egld_payment)
+    }
+
+    fn send_multiple_tokens_if_not_zero(&self, destination: &ManagedAddress, payments: &ManagedVec<EsdtTokenPayment>) -> ManagedVec<EsdtTokenPayment> {
+        let mut non_zero_payments = ManagedVec::new();
         for payment in payments {
             if payment.amount > 0u64 {
                 non_zero_payments.push(payment);
@@ -43,9 +47,6 @@ pub trait TokenSendModule {
 
         if !non_zero_payments.is_empty() {
             self.send().direct_multi(destination, &non_zero_payments);
-        }
-        if egld_payment_amount > 0u64 {
-            self.send().direct_egld(destination, &egld_payment_amount);
         }
         non_zero_payments
     }
@@ -57,4 +58,30 @@ pub trait TokenSendModule {
         }
         None
     }
+
+    fn wrap_egld(&self, amount: BigUint) -> EsdtTokenPayment {
+        let payment = self.egld_wrapper_proxy(self.egld_wrapper_address().get())
+        .wrap_egld()
+        .with_egld_transfer(amount)
+        .execute_on_dest_context();
+        payment
+    }
+
+    fn unwrap_egld(&self, payment: EsdtTokenPayment) {
+        let _: IgnoreValue = self.egld_wrapper_proxy(self.egld_wrapper_address().get())
+        .unwrap_egld()
+        .with_esdt_transfer(payment)
+        .execute_on_dest_context();
+    }
+
+    #[proxy]
+    fn egld_wrapper_proxy(&self, to: ManagedAddress) -> proxy::Proxy<Self::Api>;
+
+    #[view(getEgldWrapperAddress)]
+    #[storage_mapper("egld_wrapper_address")]
+    fn egld_wrapper_address(&self) -> SingleValueMapper<ManagedAddress>;
+
+    #[view(getEgldWrappedTokenId)]
+    #[storage_mapper("egld_wrapped_token_id")]
+    fn egld_wrapped_token_id(&self) -> SingleValueMapper<TokenIdentifier>;
 }
