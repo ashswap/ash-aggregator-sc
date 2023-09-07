@@ -164,8 +164,8 @@ pub trait AggregatorContract: token_send::TokenSendModule {
             &caller, 
             &results, 
             OptionalValue::Some(EgldWrapperOption{
-            wrapped_egld_token_id: self.egld_wrapped_token_id().get(),
-            egld_return: egld_return,
+                wrapped_egld_token_id: self.egld_wrapped_token_id().get(),
+                egld_return: egld_return,
         }));
         self.aggregate_event(&caller, AggregatorEvent { payment_in: payments.clone(), payment_out: payment_out.clone() });
         payment_out
@@ -183,10 +183,8 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         let payment_out = self.send_multiple_tokens_if_not_zero(
             &caller, 
             &results, 
-            OptionalValue::Some(EgldWrapperOption{
-            wrapped_egld_token_id: self.egld_wrapped_token_id().get(),
-            egld_return: false,
-        }));
+            OptionalValue::None
+        );
         self.aggregate_event(&caller, AggregatorEvent { payment_in: payments.clone_value(), payment_out: payment_out.clone() });
         payment_out
     }
