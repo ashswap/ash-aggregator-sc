@@ -138,7 +138,7 @@ where
                 });
             }
 
-            let mut limits = ManagedVec::new();
+            let mut limits = MultiValueEncoded::new();
             for limit in test_limits {
                 limits.push(TokenAmount {
                     token: managed_token_id!(limit.token),
@@ -146,7 +146,7 @@ where
                 });
             }
 
-            sc.aggregate(steps, limits, OptionalValue::None);
+            sc.aggregate(steps, limits);
         },
     )
 }

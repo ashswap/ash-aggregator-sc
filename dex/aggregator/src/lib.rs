@@ -5,7 +5,9 @@ multiversx_sc::derive_imports!();
 
 use common_errors::*;
 use common_structs::*;
-use core::ops::Deref;
+use token_send::EgldWrapperOption;
+
+pub mod proxy;
 
 pub const MAX_FEE_PERCENT: u64 = 100_000;
 pub const CLAIM_BATCH_SIZE: usize = 50usize;
@@ -19,7 +21,24 @@ pub struct AggregatorEvent<M: ManagedTypeApi> {
 #[multiversx_sc::contract]
 pub trait AggregatorContract: token_send::TokenSendModule {
     #[init]
-    fn init(&self) {}
+    fn init(
+        &self,
+        egld_wrapper_address: ManagedAddress,
+    ) {
+        self.egld_wrapper_address().set(egld_wrapper_address.clone());
+        let egld_wrapped_token_id: TokenIdentifier = self.egld_wrapper_proxy(egld_wrapper_address)
+            .get_wrapped_egld_token_id()
+            .execute_on_dest_context();
+        self.egld_wrapped_token_id().set(egld_wrapped_token_id);
+    }
+
+    fn wrap_egld(&self, amount: BigUint) -> EsdtTokenPayment {
+        let payment = self.egld_wrapper_proxy(self.egld_wrapper_address().get())
+        .wrap_egld()
+        .with_egld_transfer(amount)
+        .execute_on_dest_context();
+        payment
+    }
 
     fn _find_token_in_vault(&self, tokens: &ManagedVec<TokenAmount<Self::Api>>, token_id: &TokenIdentifier) -> Option<usize> {
         for (index, token) in tokens.into_iter().enumerate() {
@@ -67,12 +86,7 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         self._upsert_vaults(vaults, &step.token_out, amount_out);
     }
 
-    #[payable("*")]
-    #[endpoint]
-    fn aggregate(&self, steps: ManagedVec<AggregatorStep<Self::Api>>, limits: ManagedVec<TokenAmount<Self::Api>>, protocol: OptionalValue<ManagedAddress<Self::Api>>) -> ManagedVec<EsdtTokenPayment> {
-        let payments = self.call_value().all_esdt_transfers();
-        require!(!payments.is_empty(), ERROR_EMPTY_PAYMENTS);
-
+    fn _aggregate(&self, payments: &ManagedVec<EsdtTokenPayment>, steps: ManagedVec<AggregatorStep<Self::Api>>, limits: ManagedVec<TokenAmount<Self::Api>>, protocol: OptionalValue<ManagedAddress<Self::Api>>) -> ManagedVec<EsdtTokenPayment> {
         let mut vaults = ManagedVec::new();
         
         for payment in payments.into_iter() {
@@ -128,10 +142,52 @@ pub trait AggregatorContract: token_send::TokenSendModule {
             // remove index from vaults for de-duplicate limits
             vaults.remove(index);
         }
+        results
+    }
 
+    #[payable("*")]
+    #[endpoint]
+    fn aggregate_v2(&self, steps: ManagedVec<AggregatorStep<Self::Api>>, limits: ManagedVec<TokenAmount<Self::Api>>, egld_return: bool, protocol: OptionalValue<ManagedAddress<Self::Api>>)-> ManagedVec<EsdtTokenPayment> {
+        let mut payments = self.call_value().all_esdt_transfers().clone_value();
+        // egld value if exist
+        let egld_amount: BigUint = self.call_value().egld_value().clone_value();
+        if egld_amount > BigUint::zero() {
+            let payment  = self.wrap_egld(egld_amount);
+            payments.push(payment);
+        }
+        require!(!payments.is_empty(), ERROR_EMPTY_PAYMENTS);
+
+        
+        let results = self._aggregate(&payments, steps, limits, protocol);
         let caller = self.blockchain().get_caller();
-        let payment_out = self.send_multiple_tokens_if_not_zero(&caller, &results);
-        self.aggregate_event(&caller, AggregatorEvent { payment_in: payments.deref().clone(), payment_out: payment_out.clone() });
+        let payment_out = self.send_multiple_tokens_if_not_zero(
+            &caller, 
+            &results, 
+            OptionalValue::Some(EgldWrapperOption{
+            wrapped_egld_token_id: self.egld_wrapped_token_id().get(),
+            egld_return: egld_return,
+        }));
+        self.aggregate_event(&caller, AggregatorEvent { payment_in: payments.clone(), payment_out: payment_out.clone() });
+        payment_out
+    }
+
+    #[payable("*")]
+    #[endpoint]
+    fn aggregate(&self, steps: ManagedVec<AggregatorStep<Self::Api>>, limits: MultiValueEncoded<TokenAmount<Self::Api>>) -> ManagedVec<EsdtTokenPayment> {
+        let payments = self.call_value().all_esdt_transfers();
+        require!(!payments.is_empty(), ERROR_EMPTY_PAYMENTS);
+
+        
+        let results = self._aggregate(&payments, steps, limits.to_vec(), OptionalValue::None);
+        let caller = self.blockchain().get_caller();
+        let payment_out = self.send_multiple_tokens_if_not_zero(
+            &caller, 
+            &results, 
+            OptionalValue::Some(EgldWrapperOption{
+            wrapped_egld_token_id: self.egld_wrapped_token_id().get(),
+            egld_return: false,
+        }));
+        self.aggregate_event(&caller, AggregatorEvent { payment_in: payments.clone_value(), payment_out: payment_out.clone() });
         payment_out
     }
 
@@ -157,6 +213,7 @@ pub trait AggregatorContract: token_send::TokenSendModule {
     #[storage_mapper("ashswap_fee")]
     fn ashswap_fee(&self) -> MapMapper<TokenIdentifier, BigUint>;
 
+    #[view(getAshswapFeeAddress)]
     #[storage_mapper("ashswap_fee_address")]
     fn ashswap_fee_address(&self) -> SingleValueMapper<ManagedAddress>;
 
@@ -193,7 +250,7 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         for payment in payments.into_iter() {
             map_token_fee_amount.remove(&payment.token_identifier);
         }
-        self.send_multiple_tokens_if_not_zero(&protocol, &payments);
+        self.send_multiple_tokens_if_not_zero(&protocol, &payments, OptionalValue::None);
     }
 
     #[endpoint]
@@ -210,6 +267,17 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         for payment in payments.into_iter() {
             self.ashswap_fee().remove(&payment.token_identifier);
         }
-        self.send_multiple_tokens_if_not_zero(&self.ashswap_fee_address().get(), &payments);
+        self.send_multiple_tokens_if_not_zero(&self.ashswap_fee_address().get(), &payments, OptionalValue::None);
     }
+
+    #[proxy]
+    fn egld_wrapper_proxy(&self, to: ManagedAddress) -> proxy::Proxy<Self::Api>;
+
+    #[view(getEgldWrapperAddress)]
+    #[storage_mapper("egld_wrapper_address")]
+    fn egld_wrapper_address(&self) -> SingleValueMapper<ManagedAddress>;
+
+    #[view(getEgldWrappedTokenId)]
+    #[storage_mapper("egld_wrapped_token_id")]
+    fn egld_wrapped_token_id(&self) -> SingleValueMapper<TokenIdentifier>;
 }
