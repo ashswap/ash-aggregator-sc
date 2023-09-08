@@ -46,6 +46,7 @@ use_alpha() {
     WALLET_PEM="../wallet/dev/devnet.pem"
     PROXY="https://devnet-gateway.multiversx.com"
     EXPLORER="https://devnet-explorer.multiversx.com"
+    EGLD_WRAPPER_CONTRACT="erd1qqqqqqqqqqqqqpgq7ykazrzd905zvnlr88dpfw06677lxe9w0n4suz00uh"
 
     load
 }
@@ -55,6 +56,8 @@ use_devnet() {
     WALLET_PEM="../../wallet/dev/devnet-deployer-shard-1.pem"
     PROXY="https://devnet-gateway.multiversx.com"
     EXPLORER="https://devnet-explorer.multiversx.com"
+    EGLD_WRAPPER_CONTRACT="erd1qqqqqqqqqqqqqpgq7ykazrzd905zvnlr88dpfw06677lxe9w0n4suz00uh"
+    WEGLD_TOKEN_ID="WEGLD-d7c6bb"
 
     load
 }
@@ -64,6 +67,8 @@ use_mainnet() {
     WALLET_PEM="../../wallet/mainnet/ash-main.pem"
     PROXY="https://gateway.multiversx.com"
     EXPLORER="https://explorer.multiversx.com"
+    EGLD_WRAPPER_CONTRACT="erd1qqqqqqqqqqqqqpgqhe8t5jewej70zupmh44jurgn29psua5l2jps3ntjj3"
+    WEGLD_TOKEN_ID=" WEGLD-bd4d79"
 
     load
 }

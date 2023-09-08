@@ -132,10 +132,10 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         results
     }
 
-    #[payable("*")]
-    #[endpoint]
-    fn aggregate_v2(&self, steps: ManagedVec<AggregatorStep<Self::Api>>, limits: ManagedVec<TokenAmount<Self::Api>>, egld_return: bool, protocol: OptionalValue<ManagedAddress<Self::Api>>) {
-        let mut payments = self.call_value().all_esdt_transfers().clone_value();
+    #[payable("EGLD")]
+    #[endpoint(aggregateEgld)]
+    fn aggregate_egld(&self, steps: ManagedVec<AggregatorStep<Self::Api>>, limits: ManagedVec<TokenAmount<Self::Api>>, protocol: OptionalValue<ManagedAddress<Self::Api>>) {
+        let mut payments = ManagedVec::new();
         // egld value if exist
         let egld_amount: BigUint = self.call_value().egld_value().clone_value();
         if egld_amount > BigUint::zero() {
@@ -143,7 +143,21 @@ pub trait AggregatorContract: token_send::TokenSendModule {
             payments.push(payment);
         }
         require!(!payments.is_empty(), ERROR_EMPTY_PAYMENTS);
+        
+        let results = self._aggregate(&payments, steps, limits, protocol);
+        let caller = self.blockchain().get_caller();
+        let payment_out = self.send_multiple_tokens_if_not_zero(
+        &caller, 
+        &results
+        );
+        self.aggregate_event(&caller, AggregatorEvent { payment_in: payments.clone(), payment_out: payment_out.clone() });
+    }
 
+    #[payable("*")]
+    #[endpoint(aggregateEsdt)]
+    fn aggregate_esdt(&self, steps: ManagedVec<AggregatorStep<Self::Api>>, limits: ManagedVec<TokenAmount<Self::Api>>, egld_return: bool, protocol: OptionalValue<ManagedAddress<Self::Api>>) {
+        let payments = self.call_value().all_esdt_transfers().clone_value();
+        require!(!payments.is_empty(), ERROR_EMPTY_PAYMENTS);
         
         let results = self._aggregate(&payments, steps, limits, protocol);
         let caller = self.blockchain().get_caller();
@@ -178,6 +192,16 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         );
         self.aggregate_event(&caller, AggregatorEvent { payment_in: payments.clone_value(), payment_out: payment_out.clone() });
         payment_out
+    }
+
+    #[payable("EGLD")]
+    #[endpoint]
+    fn funny_func(&self) {
+        let caller = self.blockchain().get_caller();
+        let egld_amount: BigUint = self.call_value().egld_value().clone_value();
+        let payment  = self.wrap_egld(egld_amount.clone() / BigUint::from(2u64));
+        self.send().direct_egld(&caller.clone(), &(egld_amount.clone() / BigUint::from(2u64)));
+        self.send().direct_multi(&caller.clone(), &ManagedVec::from_single_item(payment));
     }
 
     #[event("aggregate_event")]
@@ -272,6 +296,19 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         self.send_multiple_tokens_if_not_zero(&protocol, &payments);
     }
 
+    #[endpoint(claimProtocolFeeByTokens)]
+    fn claim_protocol_fee_by_tokens(&self, protocol: ManagedAddress<Self::Api>, tokens: ManagedVec<TokenIdentifier<Self::Api>>) {
+        require!(self.protocol_fee().contains_key(&protocol), ERROR_PROTOCOL_NOT_REGISTED);
+        let mut map_token_fee_amount = self.protocol_fee().get(&protocol).unwrap();
+        let mut payments = ManagedVec::<Self::Api, EsdtTokenPayment<Self::Api>>::new();
+        for token in tokens.into_iter() {
+            let fee_amount = map_token_fee_amount.get(&token).unwrap_or_else(|| {BigUint::zero()});
+            map_token_fee_amount.remove(&token);
+            payments.push(EsdtTokenPayment::new(token, 0, fee_amount));
+        }
+        self.send_multiple_tokens_if_not_zero(&protocol, &payments);
+    }
+
     #[endpoint(claimAshswapFee)]
     fn claim_ashswap_fee(&self) {
         let mut payments = ManagedVec::<Self::Api, EsdtTokenPayment<Self::Api>>::new();
@@ -285,6 +322,17 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         }
         for payment in payments.into_iter() {
             self.ashswap_fee().remove(&payment.token_identifier);
+        }
+        self.send_multiple_tokens_if_not_zero(&self.ashswap_fee_address().get(), &payments);
+    }
+
+    #[endpoint(claimAshswapFeeByTokens)]
+    fn claim_ashswap_fee_by_tokens(&self, tokens: ManagedVec<TokenIdentifier<Self::Api>>) {
+        let mut payments = ManagedVec::<Self::Api, EsdtTokenPayment<Self::Api>>::new();
+        for token in tokens.into_iter() {
+            let fee_amount = self.ashswap_fee().get(&token).unwrap_or_else(|| {BigUint::zero()});
+            self.ashswap_fee().remove(&token);
+            payments.push(EsdtTokenPayment::new(token, 0, fee_amount));
         }
         self.send_multiple_tokens_if_not_zero(&self.ashswap_fee_address().get(), &payments);
     }
