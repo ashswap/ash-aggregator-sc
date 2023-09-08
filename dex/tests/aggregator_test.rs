@@ -236,7 +236,7 @@ where
                 });
             }
 
-            sc.aggregate_v2(steps, limits, return_egld, protocol);
+            sc.aggregate_esdt(steps, limits, return_egld, protocol);
         },
     )
     } else {
@@ -266,7 +266,7 @@ where
                     });
                 }
     
-                sc.aggregate_v2(steps, limits, return_egld, protocol);
+                sc.aggregate_egld(steps, limits, protocol);
             },)
     }
     

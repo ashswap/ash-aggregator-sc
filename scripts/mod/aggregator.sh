@@ -20,9 +20,12 @@ aggregator::deploy() {
 }
 
 aggregator::upgrade() {
+    address="0x$(mxpy wallet bech32 --decode $EGLD_WRAPPER_CONTRACT)"
+    token="0x$(echo -n $WEGLD_TOKEN_ID | xxd -p -u | tr -d '\n')"
     eval "mxpy contract upgrade $AGGREGATOR_ADDRESS $CALL_ARGS \
         --gas-limit=500000000 \
         --metadata-payable \
+        --arguments $address $token \
         --bytecode='$MY_PARENT_DIR/dex/aggregator/output/aggregator.wasm'" 1>/dev/null
 }
 

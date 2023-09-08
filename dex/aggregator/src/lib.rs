@@ -194,16 +194,6 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         payment_out
     }
 
-    #[payable("EGLD")]
-    #[endpoint]
-    fn funny_func(&self) {
-        let caller = self.blockchain().get_caller();
-        let egld_amount: BigUint = self.call_value().egld_value().clone_value();
-        let payment  = self.wrap_egld(egld_amount.clone() / BigUint::from(2u64));
-        self.send().direct_egld(&caller.clone(), &(egld_amount.clone() / BigUint::from(2u64)));
-        self.send().direct_multi(&caller.clone(), &ManagedVec::from_single_item(payment));
-    }
-
     #[event("aggregate_event")]
     fn aggregate_event(
         &self,

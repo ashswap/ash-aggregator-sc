@@ -47,6 +47,7 @@ use_alpha() {
     PROXY="https://devnet-gateway.multiversx.com"
     EXPLORER="https://devnet-explorer.multiversx.com"
     EGLD_WRAPPER_CONTRACT="erd1qqqqqqqqqqqqqpgq7ykazrzd905zvnlr88dpfw06677lxe9w0n4suz00uh"
+    WEGLD_TOKEN_ID="WEGLD-d7c6bb"
 
     load
 }

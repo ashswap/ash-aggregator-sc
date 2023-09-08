@@ -60,11 +60,11 @@ pub trait TokenSendModule {
     }
 
     fn wrap_egld(&self, amount: BigUint) -> EsdtTokenPayment {
-        let payment = self.egld_wrapper_proxy(self.egld_wrapper_address().get())
+        let _: IgnoreValue = self.egld_wrapper_proxy(self.egld_wrapper_address().get())
         .wrap_egld()
-        .with_egld_transfer(amount)
+        .with_egld_transfer(amount.clone())
         .execute_on_dest_context();
-        payment
+        EsdtTokenPayment::new(self.egld_wrapped_token_id().get(), 0, amount)
     }
 
     fn unwrap_egld(&self, payment: EsdtTokenPayment) {
