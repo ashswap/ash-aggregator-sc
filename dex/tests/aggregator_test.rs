@@ -1,8 +1,8 @@
 use aggregator::*;
 use common_errors::*;
 use common_structs::*;
-use multiversx_sc::{types::*, codec::multi_types::OptionalValue};
-use multiversx_sc_scenario::{testing_framework::*, *, multiversx_chain_vm::tx_mock::TxContextRef};
+use multiversx_sc::{codec::multi_types::OptionalValue, types::*};
+use multiversx_sc_scenario::{multiversx_chain_vm::tx_mock::TxContextRef, testing_framework::*, *};
 use wrapper_mock::EgldWrapperMock;
 pub mod protocol_mock;
 
@@ -45,7 +45,12 @@ where
 }
 
 fn set_esdt_balance(blockchain_wrapper: &mut BlockchainStateWrapper, address: &Address) {
-    for token in vec![USDC_TOKEN_ID, USDT_TOKEN_ID, BUSD_TOKEN_ID, WRAPPED_EGLD_TOKEN_ID] {
+    for token in vec![
+        USDC_TOKEN_ID,
+        USDT_TOKEN_ID,
+        BUSD_TOKEN_ID,
+        WRAPPED_EGLD_TOKEN_ID,
+    ] {
         blockchain_wrapper.set_esdt_balance(address, token, &rust_biguint!(USER_TOTAL_TOKENS));
     }
 }
@@ -63,7 +68,8 @@ where
     let rust_zero = rust_biguint!(0u64);
     let mut blockchain_wrapper = BlockchainStateWrapper::new();
     let owner_addr = blockchain_wrapper.create_user_account(&rust_zero);
-    let user_address = blockchain_wrapper.create_user_account(&rust_biguint!(1_000_000_000_000_000_000));
+    let user_address =
+        blockchain_wrapper.create_user_account(&rust_biguint!(1_000_000_000_000_000_000));
 
     let mock_wrapper = blockchain_wrapper.create_sc_account(
         &rust_zero,
@@ -79,9 +85,10 @@ where
         WRAPPER_MOCK_WASM_PATH,
     );
     blockchain_wrapper.set_esdt_balance(
-        &mock_wrapper_wrapper.address_ref().clone(), 
-        WRAPPED_EGLD_TOKEN_ID, 
-    &parse_biguint("1_000_000_000_000_000_000_000"));
+        &mock_wrapper_wrapper.address_ref().clone(),
+        WRAPPED_EGLD_TOKEN_ID,
+        &parse_biguint("1_000_000_000_000_000_000_000"),
+    );
 
     let agg_wrapper = blockchain_wrapper.create_sc_account(
         &rust_zero,
@@ -98,7 +105,10 @@ where
 
     blockchain_wrapper
         .execute_tx(&owner_addr, &agg_wrapper, &rust_zero, |sc| {
-            sc.init(managed_address!(&mock_wrapper_wrapper.address_ref().clone()), WRAPPED_EGLD_TOKEN_ID.into());
+            sc.init(
+                managed_address!(&mock_wrapper_wrapper.address_ref().clone()),
+                WRAPPED_EGLD_TOKEN_ID.into(),
+            );
         })
         .assert_ok();
 
@@ -122,7 +132,6 @@ fn parse_biguint(str: &str) -> RustBigUint {
     let str_without_underscores = str.to_owned().replace("_", "");
     RustBigUint::parse_bytes(str_without_underscores.as_bytes(), 10).unwrap()
 }
-
 
 fn check_result<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder>(
     agg_setup: &mut AggregatorSetup<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder>,
@@ -149,9 +158,10 @@ fn check_result_egld<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder
     WrapperObjBuilder: 'static + Copy + Fn() -> wrapper_mock::ContractObj<DebugApi>,
     AggregatorObjBuilder: 'static + Copy + Fn() -> aggregator::ContractObj<DebugApi>,
 {
-    agg_setup.blockchain_wrapper.check_egld_balance(&agg_setup.user_address, &expected_balance);
+    agg_setup
+        .blockchain_wrapper
+        .check_egld_balance(&agg_setup.user_address, &expected_balance);
 }
-
 
 fn aggregate<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder>(
     agg_setup: &mut AggregatorSetup<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder>,
@@ -202,7 +212,7 @@ fn aggregate_v2<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder>(
     egld_value: RustBigUint,
     payments: Vec<TxTokenTransfer>,
     return_egld: bool,
-    protocol: OptionalValue<ManagedAddress<TxContextRef>>
+    protocol: OptionalValue<ManagedAddress<TxContextRef>>,
 ) -> TxResult
 where
     ProtocolObjBuilder: 'static + Copy + Fn() -> protocol_mock::ContractObj<DebugApi>,
@@ -211,39 +221,9 @@ where
 {
     if egld_value == rust_biguint!(0) {
         agg_setup.blockchain_wrapper.execute_esdt_multi_transfer(
-        &agg_setup.user_address,
-        &agg_setup.agg_wrapper,
-        &payments,
-        |sc| {
-            let mut steps = ManagedVec::new();
-            for step in test_steps {
-                let arguments = vec![managed_buffer!(&step.token_out)];
-                steps.push(AggregatorStep {
-                    token_in: managed_token_id!(step.token_in),
-                    token_out: managed_token_id!(step.token_out),
-                    amount_in: to_managed_biguint(step.amount_in),
-                    pool_address: managed_address!(&step.pool_address),
-                    function_name: managed_buffer!(b"exchange"),
-                    arguments: ManagedVec::from(arguments),
-                });
-            }
-
-            let mut limits = ManagedVec::new();
-            for limit in test_limits {
-                limits.push(TokenAmount {
-                    token: managed_token_id!(limit.token),
-                    amount: to_managed_biguint(limit.amount),
-                });
-            }
-
-            sc.aggregate_esdt(steps, limits, return_egld, protocol);
-        },
-    )
-    } else {
-        agg_setup.blockchain_wrapper.execute_tx(
             &agg_setup.user_address,
-            &agg_setup.agg_wrapper, 
-            &egld_value, 
+            &agg_setup.agg_wrapper,
+            &payments,
             |sc| {
                 let mut steps = ManagedVec::new();
                 for step in test_steps {
@@ -257,7 +237,7 @@ where
                         arguments: ManagedVec::from(arguments),
                     });
                 }
-    
+
                 let mut limits = ManagedVec::new();
                 for limit in test_limits {
                     limits.push(TokenAmount {
@@ -265,17 +245,50 @@ where
                         amount: to_managed_biguint(limit.amount),
                     });
                 }
-    
-                sc.aggregate_egld(steps, limits, protocol);
-            },)
-    }
-    
-}
 
+                sc.aggregate_esdt(steps, limits, return_egld, protocol);
+            },
+        )
+    } else {
+        agg_setup.blockchain_wrapper.execute_tx(
+            &agg_setup.user_address,
+            &agg_setup.agg_wrapper,
+            &egld_value,
+            |sc| {
+                let mut steps = ManagedVec::new();
+                for step in test_steps {
+                    let arguments = vec![managed_buffer!(&step.token_out)];
+                    steps.push(AggregatorStep {
+                        token_in: managed_token_id!(step.token_in),
+                        token_out: managed_token_id!(step.token_out),
+                        amount_in: to_managed_biguint(step.amount_in),
+                        pool_address: managed_address!(&step.pool_address),
+                        function_name: managed_buffer!(b"exchange"),
+                        arguments: ManagedVec::from(arguments),
+                    });
+                }
+
+                let mut limits = ManagedVec::new();
+                for limit in test_limits {
+                    limits.push(TokenAmount {
+                        token: managed_token_id!(limit.token),
+                        amount: to_managed_biguint(limit.amount),
+                    });
+                }
+
+                sc.aggregate_egld(steps, limits, protocol);
+            },
+        )
+    }
+}
 
 #[test]
 fn test_aggregate_simple() {
-    let mut agg_setup = setup_aggregator(protocol_mock::contract_obj, wrapper_mock::contract_obj, aggregator::contract_obj);
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+    );
     let mock_address = agg_setup.mock_wrapper.address_ref().clone();
     let amount = 1_000_000;
 
@@ -324,7 +337,11 @@ fn test_aggregate_simple() {
 
 #[test]
 fn test_aggregate_simple_with_egld_return() {
-    let mut agg_setup = setup_aggregator(protocol_mock::contract_obj, wrapper_mock::contract_obj, aggregator::contract_obj);
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+    );
     let mock_address = agg_setup.mock_wrapper.address_ref().clone();
     let amount = 1_000_000;
 
@@ -367,14 +384,30 @@ fn test_aggregate_simple_with_egld_return() {
         },
     ];
     check_result_egld(&mut agg_setup, rust_biguint!(1_000_000_000_000_000_000));
-    aggregate_v2(&mut agg_setup, test_steps, test_limits, rust_biguint!(0), payments, true, OptionalValue::None).assert_ok();
+    aggregate_v2(
+        &mut agg_setup,
+        test_steps,
+        test_limits,
+        rust_biguint!(0),
+        payments,
+        true,
+        OptionalValue::None,
+    )
+    .assert_ok();
     check_result(&mut agg_setup, expected_balances);
-    check_result_egld(&mut agg_setup, rust_biguint!(1_000_000_000_000_000_000 + amount * 95 / 100))
+    check_result_egld(
+        &mut agg_setup,
+        rust_biguint!(1_000_000_000_000_000_000 + amount * 95 / 100),
+    )
 }
 
 #[test]
 fn test_aggregate_simple_with_egld_input() {
-    let mut agg_setup = setup_aggregator(protocol_mock::contract_obj, wrapper_mock::contract_obj, aggregator::contract_obj);
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+    );
     let mock_address = agg_setup.mock_wrapper.address_ref().clone();
     let amount = 1_000_000;
 
@@ -413,14 +446,30 @@ fn test_aggregate_simple_with_egld_input() {
         },
     ];
     check_result_egld(&mut agg_setup, rust_biguint!(1_000_000_000_000_000_000));
-    aggregate_v2(&mut agg_setup, test_steps, test_limits, rust_biguint!(amount), payments, true, OptionalValue::None).assert_ok();
+    aggregate_v2(
+        &mut agg_setup,
+        test_steps,
+        test_limits,
+        rust_biguint!(amount),
+        payments,
+        true,
+        OptionalValue::None,
+    )
+    .assert_ok();
     check_result(&mut agg_setup, expected_balances);
-    check_result_egld(&mut agg_setup, rust_biguint!(1_000_000_000_000_000_000 - amount))
+    check_result_egld(
+        &mut agg_setup,
+        rust_biguint!(1_000_000_000_000_000_000 - amount),
+    )
 }
 
 #[test]
 fn test_aggregate_error() {
-    let mut agg_setup = setup_aggregator(protocol_mock::contract_obj, wrapper_mock::contract_obj, aggregator::contract_obj);
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+    );
     let mock_address = agg_setup.mock_wrapper.address_ref().clone();
     let amount = 1_000_000;
 
@@ -489,7 +538,11 @@ fn test_aggregate_error() {
 
 #[test]
 fn test_aggregate_multi() {
-    let mut agg_setup = setup_aggregator(protocol_mock::contract_obj, wrapper_mock::contract_obj, aggregator::contract_obj);
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+    );
     let mock_address = agg_setup.mock_wrapper.address_ref().clone();
     let amount = 1_000_000;
 

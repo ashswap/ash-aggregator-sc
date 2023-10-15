@@ -23,12 +23,12 @@ load_deployed_data() {
 }
 
 load() {
-    OWNER_ADDRESS="$(mxpy wallet pem-address $WALLET_PEM)"
+    OWNER_ADDRESS=$(utils::get_result_line "mxpy wallet convert --infile $WALLET_PEM --in-format pem --out-format address-bech32" 3)
     OWNER_ADDRESS_DECODE="0x$(mxpy wallet bech32 --decode $OWNER_ADDRESS)"
 
     load_utils
     load_args
-    # update_contract_arg
+    update_contract_arg
     load_deployed_data
 }
 

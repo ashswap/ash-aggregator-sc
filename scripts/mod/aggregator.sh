@@ -2,15 +2,15 @@ aggregator::deploy() {
     address="0x$(mxpy wallet bech32 --decode $EGLD_WRAPPER_CONTRACT)"
     token="0x$(echo -n $WEGLD_TOKEN_ID | xxd -p -u | tr -d '\n')"
     eval "mxpy contract deploy $CALL_ARGS \
-        --bytecode='$MY_PARENT_DIR/dex/aggregator/output/aggregator.wasm' \
         --gas-limit=150000000 \
         --metadata-payable \
         --arguments $address $token \
+        --bytecode='$MY_PARENT_DIR/dex/aggregator/output/aggregator.wasm' \
         --outfile='deploy-aggregator.interaction.json'" 1>/dev/null
 
-    AGGREGATOR_ADDRESS=$(mxpy data parse --file="deploy-aggregator.interaction.json" --expression="data['contractAddress']")
+    AGGREGATOR_ADDRESS=$(utils::deployed_address "deploy-aggregator.interaction.json")
     AGGREGATOR_ADDRESS_DECODE="0x$(mxpy wallet bech32 --decode $AGGREGATOR_ADDRESS)"
-    TRANSACTION_HASH=$(mxpy data parse --file="deploy-aggregator.interaction.json" --expression="data['emittedTransactionHash']")
+    TRANSACTION_HASH=$(utils::deployed_tx_hash "deploy-aggregator.interaction.json")
 
     [ ! -z "$AGGREGATOR_ADDRESS" ] && mxpy data store --partition $CHAIN_ID --key=aggregator-address --value=${AGGREGATOR_ADDRESS} 1>/dev/null
     [ ! -z "$TRANSACTION_HASH" ] && mxpy data store --partition $CHAIN_ID --key=aggregator-deploy-tx --value=${TRANSACTION_HASH} 1>/dev/null
