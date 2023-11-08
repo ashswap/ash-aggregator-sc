@@ -23,3 +23,6 @@ path = "../common/errors"
 
 [dev-dependencies.common-structs]
 path = "../common/structs"
+
+[dev-dependencies.wrapper-mock]
+path = "wrapper-mock"

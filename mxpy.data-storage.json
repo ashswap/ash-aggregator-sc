@@ -1,9 +1,12 @@
 {
     "D1": {
-        "aggregator-address": "erd1qqqqqqqqqqqqqpgqqtaru570tfcq4fwer9nlnzl6n4afp4yzh2uswv2vkh",
-        "aggregator-deploy-tx": "bef4716ce0eefc79efafcb1532152bdb16174e97859701a73257071598d7b0df"
+        "aggregator-address": "erd1qqqqqqqqqqqqqpgqzshqdqcdzdl43vhy7p7q8uhc5xzu5x7zh2usyz5kg6",
+        "aggregator-deploy-tx": "76d95d042b63000bc52da42e6081632c4ed6fea5772569e2841f6a8af147412f"
     },
-    "D": {},
+    "D": {
+        "aggregator-address": "erd1qqqqqqqqqqqqqpgq4g6k2qygj4qlyxkhjmtcn7j9r27humwth2usc90tnn",
+        "aggregator-deploy-tx": "ec4c1c043e202e73fdd530426324ed3fd025a68a17b8488932ee1a699dbf62fd"
+    },
     "1": {
         "aggregator-address": "erd1qqqqqqqqqqqqqpgqglgkaxm73j7mhw5u940fsmmncnayxj884fvs54lnr6",
         "aggregator-deploy-tx": "b7e0c790f773039099291242a708bb70079e06b6ec16fddaa648e23a4c20527c"
