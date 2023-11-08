@@ -1,13 +1,16 @@
 aggregator::deploy() {
+    address="0x$(mxpy wallet bech32 --decode $EGLD_WRAPPER_CONTRACT)"
+    token="0x$(echo -n $WEGLD_TOKEN_ID | xxd -p -u | tr -d '\n')"
     eval "mxpy contract deploy $CALL_ARGS \
-        --project='$MY_PARENT_DIR/dex/aggregator' \
         --gas-limit=150000000 \
         --metadata-payable \
+        --arguments $address $token \
+        --bytecode='$MY_PARENT_DIR/dex/aggregator/output/aggregator.wasm' \
         --outfile='deploy-aggregator.interaction.json'" 1>/dev/null
 
-    AGGREGATOR_ADDRESS=$(mxpy data parse --file="deploy-aggregator.interaction.json" --expression="data['contractAddress']")
+    AGGREGATOR_ADDRESS=$(utils::deployed_address "deploy-aggregator.interaction.json")
     AGGREGATOR_ADDRESS_DECODE="0x$(mxpy wallet bech32 --decode $AGGREGATOR_ADDRESS)"
-    TRANSACTION_HASH=$(mxpy data parse --file="deploy-aggregator.interaction.json" --expression="data['emittedTransactionHash']")
+    TRANSACTION_HASH=$(utils::deployed_tx_hash "deploy-aggregator.interaction.json")
 
     [ ! -z "$AGGREGATOR_ADDRESS" ] && mxpy data store --partition $CHAIN_ID --key=aggregator-address --value=${AGGREGATOR_ADDRESS} 1>/dev/null
     [ ! -z "$TRANSACTION_HASH" ] && mxpy data store --partition $CHAIN_ID --key=aggregator-deploy-tx --value=${TRANSACTION_HASH} 1>/dev/null
@@ -17,9 +20,12 @@ aggregator::deploy() {
 }
 
 aggregator::upgrade() {
+    address="0x$(mxpy wallet bech32 --decode $EGLD_WRAPPER_CONTRACT)"
+    token="0x$(echo -n $WEGLD_TOKEN_ID | xxd -p -u | tr -d '\n')"
     eval "mxpy contract upgrade $AGGREGATOR_ADDRESS $CALL_ARGS \
         --gas-limit=500000000 \
         --metadata-payable \
+        --arguments $address $token \
         --bytecode='$MY_PARENT_DIR/dex/aggregator/output/aggregator.wasm'" 1>/dev/null
 }
 
@@ -81,4 +87,51 @@ aggregator::aggregate() {
         --gas-limit=600000000 \
         --function=ESDTTransfer \
         --arguments $token $amount $func_name $steps" 1>/dev/null
+}
+
+# params:
+#   $1 = fee <= 100_000
+#   $2 = address to receive fees
+# Example: aggregator::register_ashswap_fee 300 erd1qqqqqqqqqqqqqpgq0wn05f529heqv5r8dkl6u8n3s2hsxa6rrmcqdlutmw
+aggregator::register_ashswap_fee() {
+    address="0x$(mxpy wallet bech32 --decode $2)"
+    eval "mxpy contract call $AGGREGATOR_ADDRESS $CALL_ARGS \
+        --gas-limit=600000000 \
+        --function=registerAshswapFee \
+        --arguments $1 $address">/dev/null
+}
+
+# params:
+#   $1 = token in
+#   $2 = address to receive fees
+# Example: aggregator::register_protocol_fee 300 erd1qqqqqqqqqqqqqpgq0wn05f529heqv5r8dkl6u8n3s2hsxa6rrmcqdlutmw
+aggregator::register_protocol_fee() {
+    address="0x$(mxpy wallet bech32 --decode $2)"
+    eval "mxpy contract call $AGGREGATOR_ADDRESS $CALL_ARGS \
+        --gas-limit=600000000 \
+        --function=registerProtocolFee \
+        --arguments $1 $address">/dev/null
+}
+
+# params:
+#   $1 = fee <= 100_000
+#   $2 = address to receive fees
+# Example: aggregator::claim 300 erd1qqqqqqqqqqqqqpgq0wn05f529heqv5r8dkl6u8n3s2hsxa6rrmcqdlutmw
+aggregator::claim() {
+    address="0x$(mxpy wallet bech32 --decode $1)"
+    eval "mxpy contract call $AGGREGATOR_ADDRESS $CALL_ARGS \
+        --gas-limit=600000000 \
+        --function=claim \
+        --arguments $address">/dev/null
+}
+
+# params:
+#   $1 = fee <= 100_000
+#   $2 = address to receive fees
+# Example: aggregator::ashswap_claim 300 erd1qqqqqqqqqqqqqpgq0wn05f529heqv5r8dkl6u8n3s2hsxa6rrmcqdlutmw
+aggregator::ashswap_claim() {
+    address="0x$(mxpy wallet bech32 --decode $2)"
+    eval "mxpy contract call $AGGREGATOR_ADDRESS $CALL_ARGS \
+        --gas-limit=600000000 \
+        --function=ashswap_claim">/dev/null
 }
