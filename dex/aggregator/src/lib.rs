@@ -182,7 +182,6 @@ pub trait AggregatorContract: token_send::TokenSendModule {
     fn aggregate(&self, steps: ManagedVec<AggregatorStep<Self::Api>>, limits: MultiValueEncoded<TokenAmount<Self::Api>>) -> ManagedVec<EsdtTokenPayment> {
         let payments = self.call_value().all_esdt_transfers();
         require!(!payments.is_empty(), ERROR_EMPTY_PAYMENTS);
-
         
         let results = self._aggregate(&payments, steps, limits.to_vec(), OptionalValue::None);
         let caller = self.blockchain().get_caller();
@@ -206,7 +205,7 @@ pub trait AggregatorContract: token_send::TokenSendModule {
 
     // because the length of map fee can be very large, we might need to get fee in batch
     // to avoid memory overflow
-    #[endpoint(getClaimabeProtocolFee)]
+    #[view(getClaimabeProtocolFee)]
     fn get_claimable_protocol_fee(&self, protocol: ManagedAddress<Self::Api>, from_idx: u64, to_idx: u64) -> ManagedVec<TokenAmount<Self::Api>> {
         let mut result = ManagedVec::new();
         let mut i = 0u64;
@@ -233,7 +232,7 @@ pub trait AggregatorContract: token_send::TokenSendModule {
 
     // because the length of map fee can be very large, we might need to get fee in batch
     // to avoid memory overflow
-    #[endpoint(getClaimabeAshswapFee)]
+    #[view(getClaimabeAshswapFee)]
     fn get_claimable_ashswap_fee(&self, from_idx: u64, to_idx: u64) -> ManagedVec<TokenAmount<Self::Api>> {
         let mut result = ManagedVec::new();
         let mut i = 0u64;
