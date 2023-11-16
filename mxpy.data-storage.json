@@ -8,7 +8,7 @@
         "aggregator-deploy-tx": "ec4c1c043e202e73fdd530426324ed3fd025a68a17b8488932ee1a699dbf62fd"
     },
     "1": {
-        "aggregator-address": "erd1qqqqqqqqqqqqqpgqglgkaxm73j7mhw5u940fsmmncnayxj884fvs54lnr6",
-        "aggregator-deploy-tx": "b7e0c790f773039099291242a708bb70079e06b6ec16fddaa648e23a4c20527c"
+        "aggregator-address": "erd1qqqqqqqqqqqqqpgqcc69ts8409p3h77q5chsaqz57y6hugvc4fvs64k74v",
+        "aggregator-deploy-tx": "bbb5b9b4a9a92f02673e5ad10bef46f872456ef11ae405fe1425f1d446494e6f"
     }
 }

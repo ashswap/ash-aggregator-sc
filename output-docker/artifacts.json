@@ -1,26 +1,36 @@
 {
     "buildMetadata": {
-        "builderName": "multiversx/sdk-rust-contract-builder:v4.1.4",
-        "versionRust": "nightly-2022-10-16",
-        "versionBinaryen": "105-1",
+        "builderName": "multiversx/sdk-rust-contract-builder:v5.3.0",
+        "versionRust": "nightly-2023-05-26",
+        "versionBinaryen": "version_112",
         "versionWabt": "1.0.27-1",
-        "versionScTool": "0.39.5"
+        "versionScTool": "0.43.3",
+        "targetPlatform": "linux/amd64"
     },
     "buildOptions": {
         "packageWholeProjectSrc": false,
         "specificContract": null,
         "cargoTargetDir": "/rust/cargo-target-dir",
         "noWasmOpt": false,
-        "buildRootFolder": "/tmp/elrond-contract-rust"
+        "buildRootFolder": "/tmp/project"
     },
     "contracts": {
         "aggregator": {
             "version": "0.0.0",
-            "codehash": "8bb95f9b4eaff10140ba1f13e9787878b34ad9172474d98e50bf4c4483ea2162",
+            "codehash": "17c79ec507bdb61c566e99600b44d22174ebe2c641afef88a86c96ac37faf42c",
             "artifacts": {
                 "bytecode": "aggregator.wasm",
                 "abi": "aggregator.abi.json",
                 "srcPackage": "aggregator-0.0.0.source.json"
+            }
+        },
+        "wrapper-mock": {
+            "version": "0.0.0",
+            "codehash": "b8413d01e5adf306c1cdc5f88895ea6578c17efec3de61cfb8fb8d16f8a1bd0f",
+            "artifacts": {
+                "bytecode": "wrapper-mock.wasm",
+                "abi": "wrapper-mock.abi.json",
+                "srcPackage": "wrapper-mock-0.0.0.source.json"
             }
         }
     }

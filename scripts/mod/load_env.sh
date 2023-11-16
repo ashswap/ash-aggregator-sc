@@ -69,7 +69,7 @@ use_mainnet() {
     PROXY="https://gateway.multiversx.com"
     EXPLORER="https://explorer.multiversx.com"
     EGLD_WRAPPER_CONTRACT="erd1qqqqqqqqqqqqqpgqhe8t5jewej70zupmh44jurgn29psua5l2jps3ntjj3"
-    WEGLD_TOKEN_ID=" WEGLD-bd4d79"
+    WEGLD_TOKEN_ID="WEGLD-bd4d79"
 
     load
 }
