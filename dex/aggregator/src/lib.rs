@@ -18,11 +18,7 @@ pub struct AggregatorEvent<M: ManagedTypeApi> {
 #[multiversx_sc::contract]
 pub trait AggregatorContract: token_send::TokenSendModule {
     #[init]
-    fn init(
-        &self,
-        egld_wrapper_address: ManagedAddress,
-        egld_wrapped_token_id: TokenIdentifier,
-    ) {
+    fn init(&self, egld_wrapper_address: ManagedAddress, egld_wrapped_token_id: TokenIdentifier) {
         self.egld_wrapper_address().set(egld_wrapper_address.clone());
         self.egld_wrapped_token_id().set(egld_wrapped_token_id);
     }
@@ -73,9 +69,10 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         self._upsert_vaults(vaults, &step.token_out, amount_out);
     }
 
-    fn _aggregate(&self, payments: &ManagedVec<EsdtTokenPayment>, steps: ManagedVec<AggregatorStep<Self::Api>>, limits: ManagedVec<TokenAmount<Self::Api>>, protocol: OptionalValue<ManagedAddress<Self::Api>>) -> ManagedVec<EsdtTokenPayment> {
+    fn _aggregate(&self, payments: &ManagedVec<EsdtTokenPayment>, steps: ManagedVec<AggregatorStep<Self::Api>>,
+        limits: ManagedVec<TokenAmount<Self::Api>>, protocol: OptionalValue<ManagedAddress>) -> ManagedVec<EsdtTokenPayment> {
         let mut vaults = ManagedVec::new();
-        
+
         for payment in payments.into_iter() {
             require!(payment.token_nonce == 0, ERROR_ZERO_TOKEN_NONCE);
             require!(payment.amount > 0u64, ERROR_ZERO_AMOUNT);
@@ -96,16 +93,16 @@ pub trait AggregatorContract: token_send::TokenSendModule {
                     // key has already imported at this step due to previous require
                     // protocol fee
                     let mut map_token_fee_amount = self.protocol_fee().get(&protocol_addr).unwrap();
-                    let fee_amount = map_token_fee_amount.get(&vault.token).unwrap_or_else(|| {BigUint::zero()});
+                    let fee_amount = map_token_fee_amount.get(&vault.token).unwrap_or_else(|| BigUint::zero());
                     map_token_fee_amount.insert(vault.token.clone(), fee_amount + protocol_fee);
 
-                    let fee_amount = self.ashswap_fee().get(&vault.token).unwrap_or_else(|| {BigUint::zero()});
+                    let fee_amount = self.ashswap_fee().get(&vault.token).unwrap_or_else(|| BigUint::zero());
                     self.ashswap_fee().insert(vault.token.clone(), fee_amount + ashswap_fee);
 
                     _ = vaults.set(index, &TokenAmount::new(vault.token, vault.amount - total_fee));
-                } 
-            },
-            OptionalValue::None => {},
+                }
+            }
+            OptionalValue::None => {}
         };
 
         let mut results = ManagedVec::new();
@@ -134,46 +131,44 @@ pub trait AggregatorContract: token_send::TokenSendModule {
 
     #[payable("EGLD")]
     #[endpoint(aggregateEgld)]
-    fn aggregate_egld(&self, steps: ManagedVec<AggregatorStep<Self::Api>>, limits: ManagedVec<TokenAmount<Self::Api>>, protocol: OptionalValue<ManagedAddress<Self::Api>>) {
+    fn aggregate_egld(&self, steps: ManagedVec<AggregatorStep<Self::Api>>, limits: ManagedVec<TokenAmount<Self::Api>>,
+        protocol: OptionalValue<ManagedAddress>) -> ManagedVec<EsdtTokenPayment> {
         let mut payments = ManagedVec::new();
         // egld value if exist
         let egld_amount: BigUint = self.call_value().egld_value().clone_value();
         if egld_amount > BigUint::zero() {
-            let payment  = self.wrap_egld(egld_amount);
+            let payment = self.wrap_egld(egld_amount);
             payments.push(payment);
         }
         require!(!payments.is_empty(), ERROR_EMPTY_PAYMENTS);
-        
+
         let results = self._aggregate(&payments, steps, limits, protocol);
         let caller = self.blockchain().get_caller();
-        let payment_out = self.send_multiple_tokens_if_not_zero(
-        &caller, 
-        &results
-        );
+        let payment_out = self.send_multiple_tokens_if_not_zero(&caller, &results);
         self.aggregate_event(&caller, AggregatorEvent { payment_in: payments.clone(), payment_out: payment_out.clone() });
+        payment_out
     }
 
     #[payable("*")]
     #[endpoint(aggregateEsdt)]
-    fn aggregate_esdt(&self, steps: ManagedVec<AggregatorStep<Self::Api>>, limits: ManagedVec<TokenAmount<Self::Api>>, egld_return: bool, protocol: OptionalValue<ManagedAddress<Self::Api>>) {
+    fn aggregate_esdt(&self, steps: ManagedVec<AggregatorStep<Self::Api>>, limits: ManagedVec<TokenAmount<Self::Api>>, egld_return: bool,
+        protocol: OptionalValue<ManagedAddress>) -> MultiValue2<BigUint, ManagedVec<EsdtTokenPayment>> {
         let payments = self.call_value().all_esdt_transfers().clone_value();
         require!(!payments.is_empty(), ERROR_EMPTY_PAYMENTS);
-        
+
         let results = self._aggregate(&payments, steps, limits, protocol);
         let caller = self.blockchain().get_caller();
         if egld_return {
-            let (mut payment_out, egld_payment) = self.send_multiple_tokens_if_not_zero_support_egld(
-                &caller, 
-                &results
-            );
-            payment_out.push(egld_payment); // distinct between egld and wegld in event log is not necessary
-            self.aggregate_event(&caller, AggregatorEvent { payment_in: payments.clone(), payment_out: payment_out.clone() });
+            let (payment_out, egld_payment) =
+                self.send_multiple_tokens_if_not_zero_support_egld(&caller, &results);
+            let mut payment_events = payment_out.clone();
+            payment_events.push(egld_payment.clone()); // distinct between egld and wegld in event log is not necessary
+            self.aggregate_event(&caller, AggregatorEvent { payment_in: payments.clone(), payment_out: payment_events.clone() });
+            MultiValue2::from((egld_payment.amount, payment_out))
         } else {
-            let payment_out = self.send_multiple_tokens_if_not_zero(
-            &caller, 
-            &results
-            );
+            let payment_out = self.send_multiple_tokens_if_not_zero(&caller, &results);
             self.aggregate_event(&caller, AggregatorEvent { payment_in: payments.clone(), payment_out: payment_out.clone() });
+            MultiValue2::from((BigUint::zero(), payment_out))
         }
     }
 
@@ -182,13 +177,10 @@ pub trait AggregatorContract: token_send::TokenSendModule {
     fn aggregate(&self, steps: ManagedVec<AggregatorStep<Self::Api>>, limits: MultiValueEncoded<TokenAmount<Self::Api>>) -> ManagedVec<EsdtTokenPayment> {
         let payments = self.call_value().all_esdt_transfers();
         require!(!payments.is_empty(), ERROR_EMPTY_PAYMENTS);
-        
+
         let results = self._aggregate(&payments, steps, limits.to_vec(), OptionalValue::None);
         let caller = self.blockchain().get_caller();
-        let payment_out = self.send_multiple_tokens_if_not_zero(
-            &caller, 
-            &results, 
-        );
+        let payment_out = self.send_multiple_tokens_if_not_zero(&caller, &results);
         self.aggregate_event(&caller, AggregatorEvent { payment_in: payments.clone_value(), payment_out: payment_out.clone() });
         payment_out
     }
@@ -206,7 +198,7 @@ pub trait AggregatorContract: token_send::TokenSendModule {
     // because the length of map fee can be very large, we might need to get fee in batch
     // to avoid memory overflow
     #[view(getClaimabeProtocolFee)]
-    fn get_claimable_protocol_fee(&self, protocol: ManagedAddress<Self::Api>, from_idx: u64, to_idx: u64) -> ManagedVec<TokenAmount<Self::Api>> {
+    fn get_claimable_protocol_fee(&self, protocol: ManagedAddress, from_idx: u64, to_idx: u64) -> ManagedVec<TokenAmount<Self::Api>> {
         let mut result = ManagedVec::new();
         let mut i = 0u64;
         for (token, fee_amount) in self.protocol_fee().get(&protocol).unwrap().into_iter() {
@@ -267,10 +259,10 @@ pub trait AggregatorContract: token_send::TokenSendModule {
     fn ashswap_fee_percent(&self) -> SingleValueMapper<u64>;
 
     #[endpoint(claimProtocolFee)]
-    fn claim_protocol_fee(&self, protocol: ManagedAddress<Self::Api>) {
+    fn claim_protocol_fee(&self, protocol: ManagedAddress) {
         require!(self.protocol_fee().contains_key(&protocol), ERROR_PROTOCOL_NOT_REGISTED);
         let mut map_token_fee_amount = self.protocol_fee().get(&protocol).unwrap();
-        let mut payments = ManagedVec::<Self::Api, EsdtTokenPayment<Self::Api>>::new();
+        let mut payments = ManagedVec::<Self::Api, EsdtTokenPayment>::new();
         let mut i = 0usize;
         for (token, fee_amount) in map_token_fee_amount.into_iter() {
             payments.push(EsdtTokenPayment::new(token, 0, fee_amount));
@@ -286,12 +278,12 @@ pub trait AggregatorContract: token_send::TokenSendModule {
     }
 
     #[endpoint(claimProtocolFeeByTokens)]
-    fn claim_protocol_fee_by_tokens(&self, protocol: ManagedAddress<Self::Api>, tokens: ManagedVec<TokenIdentifier<Self::Api>>) {
+    fn claim_protocol_fee_by_tokens(&self, protocol: ManagedAddress, tokens: ManagedVec<TokenIdentifier>) {
         require!(self.protocol_fee().contains_key(&protocol), ERROR_PROTOCOL_NOT_REGISTED);
         let mut map_token_fee_amount = self.protocol_fee().get(&protocol).unwrap();
-        let mut payments = ManagedVec::<Self::Api, EsdtTokenPayment<Self::Api>>::new();
+        let mut payments = ManagedVec::<Self::Api, EsdtTokenPayment>::new();
         for token in tokens.into_iter() {
-            let fee_amount = map_token_fee_amount.get(&token).unwrap_or_else(|| {BigUint::zero()});
+            let fee_amount = map_token_fee_amount.get(&token).unwrap_or_else(|| BigUint::zero());
             map_token_fee_amount.remove(&token);
             payments.push(EsdtTokenPayment::new(token, 0, fee_amount));
         }
@@ -300,7 +292,7 @@ pub trait AggregatorContract: token_send::TokenSendModule {
 
     #[endpoint(claimAshswapFee)]
     fn claim_ashswap_fee(&self) {
-        let mut payments = ManagedVec::<Self::Api, EsdtTokenPayment<Self::Api>>::new();
+        let mut payments = ManagedVec::<Self::Api, EsdtTokenPayment>::new();
         let mut i = 0usize;
         for (token, fee_amount) in self.ashswap_fee().into_iter() {
             payments.push(EsdtTokenPayment::new(token, 0, fee_amount));
@@ -316,10 +308,10 @@ pub trait AggregatorContract: token_send::TokenSendModule {
     }
 
     #[endpoint(claimAshswapFeeByTokens)]
-    fn claim_ashswap_fee_by_tokens(&self, tokens: ManagedVec<TokenIdentifier<Self::Api>>) {
-        let mut payments = ManagedVec::<Self::Api, EsdtTokenPayment<Self::Api>>::new();
+    fn claim_ashswap_fee_by_tokens(&self, tokens: ManagedVec<TokenIdentifier>) {
+        let mut payments = ManagedVec::<Self::Api, EsdtTokenPayment>::new();
         for token in tokens.into_iter() {
-            let fee_amount = self.ashswap_fee().get(&token).unwrap_or_else(|| {BigUint::zero()});
+            let fee_amount = self.ashswap_fee().get(&token).unwrap_or_else(|| BigUint::zero());
             self.ashswap_fee().remove(&token);
             payments.push(EsdtTokenPayment::new(token, 0, fee_amount));
         }
