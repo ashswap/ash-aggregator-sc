@@ -1,9 +1,9 @@
 multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
 
-#[derive(TopEncode, TopDecode, NestedEncode, NestedDecode, PartialEq, TypeAbi, Clone, ManagedVecItem)]
+#[derive(TopEncode, TopDecode, NestedEncode, NestedDecode, PartialEq, Clone)]
 pub struct JexExchangePool<M: ManagedTypeApi> {
-    pub paused: u8,
+    pub paused: bool,
     pub first_token_identifier: TokenIdentifier<M>,
     pub first_token_reserve: BigUint<M>,
     pub second_token_identifier: TokenIdentifier<M>,
@@ -13,6 +13,10 @@ pub struct JexExchangePool<M: ManagedTypeApi> {
     pub owner: ManagedAddress<M>,
     pub lp_fees: u32,
     pub platform_fees: u32,
+    pub platform_fees_receiver: Option<ManagedAddress<M>>,
+    pub volume_prev_epoch: [BigUint<M>; 2],
+    pub fees_prev_epoch: [BigUint<M>; 2],
+    pub fees_last_7_epochs: [BigUint<M>; 2],
 }
 
 #[multiversx_sc::proxy]

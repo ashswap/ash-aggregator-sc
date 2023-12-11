@@ -7,7 +7,7 @@ use self::proxy::*;
 
 #[derive(TopEncode, TopDecode, NestedEncode, NestedDecode, PartialEq, TypeAbi, Clone)]
 pub struct JexExchangeView<M: ManagedTypeApi> {
-    pub paused: u8,
+    pub paused: bool,
     pub reserve_0: BigUint<M>,
     pub reserve_1: BigUint<M>,
     pub lp_fees: u32,
