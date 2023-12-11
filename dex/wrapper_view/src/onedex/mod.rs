@@ -33,6 +33,8 @@ pub trait WrapperModule {
     fn get_onedex(&self, pool_address: ManagedAddress, token_id_0: TokenIdentifier, token_id_1: TokenIdentifier) -> OnedexView<Self::Api> {
         let total_fee: BigUint = self.proxy(pool_address.clone()).get_total_fee_percent().execute_on_dest_context();
         let pairs: ManagedVec<OnedexPool<Self::Api>> = self.proxy(pool_address.clone()).view_pairs().execute_on_dest_context();
+        let token_1 = pairs.len();
+        require!(false, "{}", token_1);
 
         for pair in pairs.into_iter() {
             if pair.id == 28 {
