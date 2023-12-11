@@ -35,6 +35,8 @@ pub trait WrapperModule {
         let pairs: ManagedVec<OnedexPool<Self::Api>> = self.proxy(pool_address.clone()).view_pairs().execute_on_dest_context();
 
         for pair in pairs.into_iter() {
+            let token_id_0 = pair.token_id_0.clone();
+            require!(false, "{}", token_id_0);
             if pair.token_id_0 == token_id_0 && pair.token_id_1 == token_id_1 {
                 return OnedexView {
                     status: pair.status,
