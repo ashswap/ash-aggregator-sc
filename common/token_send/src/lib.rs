@@ -33,7 +33,7 @@ pub trait TokenSendModule {
             self.unwrap_egld(unwrap_egld_payment.clone());
             self.send().direct_egld(destination, &unwrap_egld_payment.amount);
         }
-        
+
         (non_zero_payments, unwrap_egld_payment)
     }
 
@@ -61,17 +61,13 @@ pub trait TokenSendModule {
 
     fn wrap_egld(&self, amount: BigUint) -> EsdtTokenPayment {
         let _: IgnoreValue = self.egld_wrapper_proxy(self.egld_wrapper_address().get())
-        .wrap_egld()
-        .with_egld_transfer(amount.clone())
-        .execute_on_dest_context();
+            .wrap_egld().with_egld_transfer(amount.clone()).execute_on_dest_context();
         EsdtTokenPayment::new(self.egld_wrapped_token_id().get(), 0, amount)
     }
 
     fn unwrap_egld(&self, payment: EsdtTokenPayment) {
         let _: IgnoreValue = self.egld_wrapper_proxy(self.egld_wrapper_address().get())
-        .unwrap_egld()
-        .with_esdt_transfer(payment)
-        .execute_on_dest_context();
+            .unwrap_egld().with_esdt_transfer(payment).execute_on_dest_context();
     }
 
     #[proxy]

@@ -10,7 +10,7 @@ pub trait EgldWrapper {
     #[payable("*")]
     #[endpoint(unwrapEgld)]
     fn unwrap_egld(&self);
-    
+
     #[view(getWrappedEgldTokenId)]
     fn get_wrapped_egld_token_id(&self) -> TokenIdentifier;
 }
