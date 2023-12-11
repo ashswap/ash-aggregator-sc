@@ -11,7 +11,11 @@ pub mod xexchange;
 
 #[multiversx_sc::contract]
 pub trait WrapperView:
-    jexexchange::WrapperModule + onedex::WrapperModule + xexchange::WrapperModule
+    ashswapv1::WrapperModule
+    + ashswapv2::WrapperModule
+    + jexexchange::WrapperModule
+    + onedex::WrapperModule
+    + xexchange::WrapperModule
 {
     #[init]
     fn init(&self) {}

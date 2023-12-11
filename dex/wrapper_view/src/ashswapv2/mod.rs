@@ -37,7 +37,7 @@ pub trait WrapperModule {
     fn proxy(&self, pool_address: ManagedAddress) -> proxy::Proxy<Self::Api>;
 
     #[view(getAshswapV2)]
-    fn get_xexchange(&self, pool_address: ManagedAddress, token_0: TokenIdentifier, token_1: TokenIdentifier) -> AshswapV2View<Self::Api> {
+    fn get_ashswapv2(&self, pool_address: ManagedAddress, token_id_0: TokenIdentifier, token_id_1: TokenIdentifier) -> XExchangeView<Self::Api> {
         let state: u8 = self.proxy(pool_address.clone()).get_state().execute_on_dest_context();
         let total_supply: BigUint<Self::Api> = self.proxy(pool_address.clone()).get_lp_token_supply().execute_on_dest_context();
         let reserves: ManagedVec<Self::Api, BigUint<Self::Api>> = self.proxy(pool_address.clone()).get_balances().execute_on_dest_context();
