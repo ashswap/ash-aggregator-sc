@@ -71,5 +71,4 @@ pub trait WrapperProxy {
 
     #[view(isNotAdjusted)]
     fn is_not_adjusted(&self) -> bool;
-
 }

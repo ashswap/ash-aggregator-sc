@@ -20,21 +20,24 @@ wrapper::upgrade() {
 
 wrapper::get_ashswapv1() {
     address="0x$(mxpy wallet bech32 --decode $1)"
-    eval "mxpy contract query $DELEGATE_ADDRESS $QUERY_ARGS \
+    eval "mxpy contract query $WRAPPER_ADDRESS $QUERY_ARGS \
         --function=getAshswapV1 \
         --arguments $address"
 }
 
 wrapper::get_ashswapv2() {
     address="0x$(mxpy wallet bech32 --decode $1)"
-    eval "mxpy contract query $DELEGATE_ADDRESS $QUERY_ARGS \
+    token_0="0x$(echo -n $2 | xxd -p -u | tr -d '\n')"
+    token_1="0x$(echo -n $3 | xxd -p -u | tr -d '\n')"
+
+    eval "mxpy contract query $WRAPPER_ADDRESS $QUERY_ARGS \
         --function=getAshswapV2 \
-        --arguments $address"
+        --arguments $address $token_0 $token_1"
 }
 
 wrapper::get_jexexchange() {
     address="0x$(mxpy wallet bech32 --decode $1)"
-    eval "mxpy contract query $DELEGATE_ADDRESS $QUERY_ARGS \
+    eval "mxpy contract query $WRAPPER_ADDRESS $QUERY_ARGS \
         --function=getJexExchange \
         --arguments $address"
 }
@@ -43,7 +46,8 @@ wrapper::get_onedex() {
     address="0x$(mxpy wallet bech32 --decode $1)"
     token_0="0x$(echo -n $2 | xxd -p -u | tr -d '\n')"
     token_1="0x$(echo -n $3 | xxd -p -u | tr -d '\n')"
-    eval "mxpy contract query $DELEGATE_ADDRESS $QUERY_ARGS \
+
+    eval "mxpy contract query $WRAPPER_ADDRESS $QUERY_ARGS \
         --function=getOnedex \
         --arguments $address $token_0 $token_1"
 }
@@ -52,7 +56,8 @@ wrapper::get_xexchange() {
     address="0x$(mxpy wallet bech32 --decode $1)"
     token_0="0x$(echo -n $2 | xxd -p -u | tr -d '\n')"
     token_1="0x$(echo -n $3 | xxd -p -u | tr -d '\n')"
-    eval "mxpy contract query $DELEGATE_ADDRESS $QUERY_ARGS \
+
+    eval "mxpy contract query $WRAPPER_ADDRESS $QUERY_ARGS \
         --function=getXExchange \
         --arguments $address $token_0 $token_1"
 }
