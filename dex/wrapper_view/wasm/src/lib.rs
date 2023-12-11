@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                            3
+// Endpoints:                            5
 // Async Callback (empty):               1
-// Total number of exported functions:   5
+// Total number of exported functions:   7
 
 #![no_std]
 #![feature(alloc_error_handler, lang_items)]
@@ -18,6 +18,8 @@ multiversx_sc_wasm_adapter::panic_handler!();
 multiversx_sc_wasm_adapter::endpoints! {
     wrapper_view
     (
+        getAshswapV1
+        getAshswapV2
         getJexExchange
         getOnedex
         getXExchange
