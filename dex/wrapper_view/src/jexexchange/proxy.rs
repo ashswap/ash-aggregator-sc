@@ -18,5 +18,5 @@ pub struct JexExchangePool<M: ManagedTypeApi> {
 #[multiversx_sc::proxy]
 pub trait WrapperProxy {
     #[view(getStatus)]
-    fn get_status(&self) -> ManagedVec<JexExchangePool<Self::Api>>;
+    fn get_status(&self) -> JexExchangePool<Self::Api>;
 }
