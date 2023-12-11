@@ -13,14 +13,9 @@ pub struct OnedexView<M: ManagedTypeApi> {
     pub reserve_1: BigUint<M>,
 }
 
-impl<M: ManagedTypeApi> OnedexView<M>  {
+impl<M: ManagedTypeApi> OnedexView<M> {
     pub fn empty() -> Self {
-        Self {
-            status: 0,
-            total_fee: BigUint::zero(),
-            reserve_0: BigUint::zero(),
-            reserve_1: BigUint::zero(),
-        }
+        Self { status: 0, total_fee: BigUint::zero(), reserve_0: BigUint::zero(), reserve_1: BigUint::zero() }
     }
 }
 
@@ -32,16 +27,9 @@ pub trait WrapperModule {
     #[view(getOnedex)]
     fn get_onedex(&self, pool_address: ManagedAddress, token_id_0: TokenIdentifier, token_id_1: TokenIdentifier) -> OnedexView<Self::Api> {
         let total_fee: BigUint = self.proxy(pool_address.clone()).get_total_fee_percent().execute_on_dest_context();
-        let pairs: ManagedVec<OnedexPool<Self::Api>> = self.proxy(pool_address.clone()).view_pairs().execute_on_dest_context();
-        let token_1 = pairs.len();
-        require!(false, "{}", token_1);
+        let pairs: MultiValueEncoded<OnedexPool<Self::Api>> = self.proxy(pool_address.clone()).view_pairs().execute_on_dest_context();
 
         for pair in pairs.into_iter() {
-            if pair.id == 28 {
-                let token_0 = pair.token_id_0.clone();
-                let token_1 = pair.token_id_1.clone();
-                require!(false, "{} {} {} {}", token_id_0, token_id_1, token_0, token_1);
-            }
             if pair.token_id_0 == token_id_0 && pair.token_id_1 == token_id_1 {
                 return OnedexView {
                     status: pair.status,

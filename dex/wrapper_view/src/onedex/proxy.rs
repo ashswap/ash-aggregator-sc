@@ -23,5 +23,5 @@ pub trait WrapperProxy {
     fn get_total_fee_percent(&self) -> BigUint;
 
     #[view(viewPairs)]
-    fn view_pairs(&self) -> ManagedVec<OnedexPool<Self::Api>>;
+    fn view_pairs(&self) -> MultiValueEncoded<OnedexPool<Self::Api>>;
 }
