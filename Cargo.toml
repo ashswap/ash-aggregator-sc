@@ -3,6 +3,8 @@ members = [
     "dex",
     "dex/aggregator",
     "dex/aggregator/meta",
+    "dex/wrapper_view",
+    "dex/wrapper_view/meta",
     "dex/wrapper-mock",
     "dex/wrapper-mock/meta",
 ]

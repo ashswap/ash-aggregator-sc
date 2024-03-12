@@ -1329,6 +1329,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "wrapper_view"
+version = "0.0.0"
+dependencies = [
+ "multiversx-sc",
+]
+
+[[package]]
+name = "wrapper_view-meta"
+version = "0.0.0"
+dependencies = [
+ "multiversx-sc-meta",
+ "wrapper_view",
+]
+
+[[package]]
 name = "zeroize"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

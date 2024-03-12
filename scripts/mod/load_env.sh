@@ -18,12 +18,14 @@ update_contract_arg() {
 }
 
 load_deployed_data() {
+    WRAPPER_ADDRESS=$(mxpy data load --partition $CHAIN_ID --key=wrapper-address)
+    [ ! -z "$WRAPPER_ADDRESS" ] && WRAPPER_ADDRESS_DECODE="0x$(mxpy wallet bech32 --decode $WRAPPER_ADDRESS)"
     AGGREGATOR_ADDRESS=$(mxpy data load --partition $CHAIN_ID --key=aggregator-address)
     [ ! -z "$AGGREGATOR_ADDRESS" ] && AGGREGATOR_ADDRESS_DECODE="0x$(mxpy wallet bech32 --decode $AGGREGATOR_ADDRESS)"
 }
 
 load() {
-    OWNER_ADDRESS=$(utils::get_result_line "mxpy wallet convert --infile $WALLET_PEM --in-format pem --out-format address-bech32" 3)
+    OWNER_ADDRESS=$(utils::get_last_line "mxpy wallet convert --infile $WALLET_PEM --in-format pem --out-format address-bech32")
     OWNER_ADDRESS_DECODE="0x$(mxpy wallet bech32 --decode $OWNER_ADDRESS)"
 
     load_utils

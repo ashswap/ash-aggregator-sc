@@ -6,6 +6,7 @@ MY_PARENT_DIR="$(dirname "$MY_DIR")"
 ## Source all scripts
 source "$MY_DIR/mod/utils.sh"
 source "$MY_DIR/mod/load_env.sh"
+source "$MY_DIR/mod/wrapper.sh"
 source "$MY_DIR/mod/aggregator.sh"
 
 ## Select env
