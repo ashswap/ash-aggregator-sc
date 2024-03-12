@@ -61,3 +61,10 @@ wrapper::get_xexchange() {
         --function=getXExchange \
         --arguments $address $token_0 $token_1"
 }
+
+wrapper::get_hatom() {
+    address="0x$(mxpy wallet bech32 --decode $1)"
+    eval "mxpy contract query $WRAPPER_ADDRESS $QUERY_ARGS \
+        --function=getHatom \
+        --arguments $address"
+}
