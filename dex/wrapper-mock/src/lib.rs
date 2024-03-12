@@ -6,12 +6,10 @@ multiversx_sc::derive_imports!();
 #[multiversx_sc::contract]
 pub trait EgldWrapperMock {
     #[init]
-    fn init(
-        &self,
-        token_id: TokenIdentifier,
-    ) {
+    fn init(&self, token_id: TokenIdentifier) {
         self.wrapped_egld_token_id().set(token_id);
     }
+
     #[payable("EGLD")]
     #[endpoint(wrapEgld)]
     fn wrap_egld(&self) -> EsdtTokenPayment<Self::Api> {
@@ -28,12 +26,8 @@ pub trait EgldWrapperMock {
         require!(payment.token_identifier == self.wrapped_egld_token_id().get(), "Wrong token id");
         self.send().direct_egld(&self.blockchain().get_caller(), &payment.amount);
     }
-    
-    #[view(getWrappedEgldTokenId)]
-    fn get_wrapped_egld_token_id(&self) -> TokenIdentifier {
-        self.wrapped_egld_token_id().get()
-    }
 
+    #[view(getWrappedEgldTokenId)]
     #[storage_mapper("wrapped_egld_token_id")]
     fn wrapped_egld_token_id(&self) -> SingleValueMapper<TokenIdentifier>;
 }
