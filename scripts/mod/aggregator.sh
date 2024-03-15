@@ -1,10 +1,7 @@
 aggregator::deploy() {
-    address="0x$(mxpy wallet bech32 --decode $EGLD_WRAPPER_CONTRACT)"
-    token="0x$(echo -n $WEGLD_TOKEN_ID | xxd -p -u | tr -d '\n')"
     eval "mxpy contract deploy $CALL_ARGS \
         --gas-limit=150000000 \
         --metadata-payable \
-        --arguments $address $token \
         --bytecode='$MY_PARENT_DIR/dex/aggregator/output/aggregator.wasm' \
         --outfile='deploy-aggregator.interaction.json'" 1>/dev/null
 

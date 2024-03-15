@@ -18,5 +18,5 @@ path = "../../common/structs"
 path = "../../common/token_send"
 
 [dependencies.multiversx-sc]
-version = "0.40.0"
+version = "0.47.5"
 features = ["esdt-token-payment-legacy-decode"]
