@@ -177,9 +177,9 @@ where
 {
     if payment.token_identifier == b"egld" {
         agg_setup.blockchain_wrapper.execute_tx(
-            &agg_setup.user_address, 
-            &agg_setup.agg_wrapper, 
-            &payment.value, 
+            &agg_setup.user_address,
+            &agg_setup.agg_wrapper,
+            &payment.value,
             |sc| {
                 let mut steps = ManagedVec::new();
                 for step in test_steps {
@@ -194,8 +194,8 @@ where
                     });
                 }
                 if protocol.is_none() {
-                        sc.aggregate(
-                        managed_egld_token_id!(), 
+                    sc.aggregate(
+                        managed_egld_token_id!(),
                         managed_token_id_wrapped!(token_out),
                         to_managed_biguint(limit),
                         steps,
@@ -203,7 +203,7 @@ where
                     );
                 } else {
                     sc.aggregate(
-                        managed_egld_token_id!(), 
+                        managed_egld_token_id!(),
                         managed_token_id_wrapped!(token_out),
                         to_managed_biguint(limit),
                         steps,
@@ -367,16 +367,82 @@ fn test_aggregate_simple() {
         &mut agg_setup,
         USDC_TOKEN_ID,
         BUSD_TOKEN_ID,
-        test_steps, 
-        rust_biguint!(0), 
+        test_steps,
+        rust_biguint!(0),
         Option::None,
         TxTokenTransfer {
             token_identifier: USDC_TOKEN_ID.to_vec(),
             nonce: 0,
             value: rust_biguint!(amount),
-        }
-    ).assert_ok();
+        },
+    )
+    .assert_ok();
     check_result(&mut agg_setup, expected_balances);
+}
+
+#[test]
+fn test_aggregate_exploit() {
+    const FAKE_TOKEN_ID: &[u8] = b"FAKE-abcdef";
+
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+    );
+
+    let mock_address = agg_setup.mock_wrapper.address_ref().clone();
+
+    let _ = &agg_setup.blockchain_wrapper.set_esdt_balance(
+        &agg_setup.agg_wrapper.address_ref(),
+        BUSD_TOKEN_ID,
+        &rust_biguint!(1000000000),
+    );
+
+    let _ = &agg_setup.blockchain_wrapper.set_esdt_balance(
+        &mock_address,
+        FAKE_TOKEN_ID,
+        &rust_biguint!(1000000000),
+    );
+
+    let balance = &agg_setup.blockchain_wrapper.get_esdt_balance(
+        &agg_setup.mock_wrapper.address_ref(),
+        BUSD_TOKEN_ID,
+        0,
+    );
+
+    println!("{:?}", balance);
+
+    let _ = &agg_setup
+        .blockchain_wrapper
+        .execute_tx(
+            &agg_setup.user_address,
+            &agg_setup.agg_wrapper,
+            &rust_biguint!(1),
+            |sc| {
+                let mut arguments = ManagedVec::new();
+                arguments.push(managed_buffer!(BUSD_TOKEN_ID));
+                arguments.push(managed_buffer!(b"1000"));
+                arguments.push(managed_buffer!(b"exchange"));
+                arguments.push(managed_buffer!(FAKE_TOKEN_ID));
+                sc.aggregate_exploit(
+                    managed_address!(&mock_address.clone()),
+                    "ESDTTransfer".into(),
+                    arguments,
+                    EgldOrEsdtTokenIdentifier::egld(),
+                    managed_biguint!(1u64),
+                    managed_token_id_wrapped!(FAKE_TOKEN_ID.to_vec()),
+                )
+            },
+        )
+        .assert_ok();
+
+    let balance = &agg_setup.blockchain_wrapper.get_esdt_balance(
+        &agg_setup.mock_wrapper.address_ref(),
+        BUSD_TOKEN_ID,
+        0,
+    );
+
+    println!("{:?}", balance);
 }
 
 // #[test]
@@ -532,14 +598,15 @@ fn test_aggregate_error() {
     };
 
     aggregate(
-        &mut agg_setup, 
-        USDC_TOKEN_ID, 
-        BUSD_TOKEN_ID, 
-        test_steps, 
-        rust_biguint!(0), 
-        Option::None, 
-        payment
-    ).assert_user_error(ERROR_INVALID_TOKEN_IN);
+        &mut agg_setup,
+        USDC_TOKEN_ID,
+        BUSD_TOKEN_ID,
+        test_steps,
+        rust_biguint!(0),
+        Option::None,
+        payment,
+    )
+    .assert_user_error(ERROR_INVALID_TOKEN_IN);
 
     // invalid amount in
     let test_steps = vec![TestAggregatorStep {
@@ -555,13 +622,14 @@ fn test_aggregate_error() {
         value: rust_biguint!(amount),
     };
 
-    aggregate(&mut agg_setup, 
+    aggregate(
+        &mut agg_setup,
         USDC_TOKEN_ID,
         BUSD_TOKEN_ID,
-        test_steps, 
-        rust_biguint!(0), 
+        test_steps,
+        rust_biguint!(0),
         Option::None,
-        payment
+        payment,
     )
     .assert_user_error(ERROR_INVALID_AMOUNT_IN);
 
@@ -590,14 +658,16 @@ fn test_aggregate_error() {
         value: rust_biguint!(amount),
     };
 
-    aggregate(&mut agg_setup, 
+    aggregate(
+        &mut agg_setup,
         USDC_TOKEN_ID,
         BUSD_TOKEN_ID,
-        test_steps, 
-        rust_biguint!(amount), 
+        test_steps,
+        rust_biguint!(amount),
         Option::None,
-        payment
-    ).assert_user_error(ERROR_SLIPPAGE_SCREW_YOU);
+        payment,
+    )
+    .assert_user_error(ERROR_SLIPPAGE_SCREW_YOU);
 }
 
 #[test]
@@ -638,13 +708,14 @@ fn test_aggregate_error_invalid_amount_in_step() {
         value: rust_biguint!(amount),
     };
 
-    aggregate(&mut agg_setup, 
+    aggregate(
+        &mut agg_setup,
         USDC_TOKEN_ID,
         WRAPPED_EGLD_TOKEN_ID,
-        test_steps, 
-        rust_biguint!(0), 
+        test_steps,
+        rust_biguint!(0),
         Option::None,
-        payment
-    ).assert_user_error(ERROR_INVALID_TOKEN_IN);
+        payment,
+    )
+    .assert_user_error(ERROR_INVALID_TOKEN_IN);
 }
-
