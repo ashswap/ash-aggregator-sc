@@ -1,7 +1,7 @@
 {
     "D1": {
-        "wrapper-address": "erd1qqqqqqqqqqqqqpgq5d38th80q4ysgrkz20t7ucdyjg3p8fh4h2uszynyrf",
-        "wrapper-deploy-tx": "32803c328a46ec4325a32b622d8e2bc63d48ab9bb426e0b84a69bb2b6c691772",
+        "wrapper-address": "erd1qqqqqqqqqqqqqpgq78mwlwg62mdzw78xmwe46kemcangrauqh2us56kxz5",
+        "wrapper-deploy-tx": "55fec50db2f6655f0608f631326a0d0307fc44affd8c7674ec704075bb785964",
         "aggregator-address": "erd1qqqqqqqqqqqqqpgqvzupy3y6h6rtc8jhtel4xcg0n5r2vmv5h2uss509am",
         "aggregator-deploy-tx": "8a7b30724ee86fdda74da29109e8cf0bdc13ec8403630b5f5152cca853cc58b9"
     },
