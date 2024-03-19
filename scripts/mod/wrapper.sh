@@ -10,6 +10,9 @@ wrapper::deploy() {
 
     [ ! -z "$WRAPPER_ADDRESS" ] && mxpy data store --partition $CHAIN_ID --key=wrapper-address --value=${WRAPPER_ADDRESS} 1>/dev/null
     [ ! -z "$TRANSACTION_HASH" ] && mxpy data store --partition $CHAIN_ID --key=wrapper-deploy-tx --value=${TRANSACTION_HASH} 1>/dev/null
+
+    echo "Contract address: $WRAPPER_ADDRESS"
+    echo "Deploy transaction hash: $EXPLORER/transactions/$TRANSACTION_HASH"
 }
 
 wrapper::upgrade() {

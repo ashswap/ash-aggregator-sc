@@ -8,4 +8,6 @@ members = [
     "dex/wrapper_view/meta",
     "dex/wrapper-mock",
     "dex/wrapper-mock/meta",
+    "dex/fee",
+    "dex/fee/meta",
 ]

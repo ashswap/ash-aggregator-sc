@@ -10,6 +10,7 @@ pub mod onedex;
 pub mod xexchange;
 pub mod hatom;
 pub mod tinder;
+pub mod hatomliquidstaking;
 
 #[multiversx_sc::contract]
 pub trait WrapperView:
@@ -20,6 +21,7 @@ pub trait WrapperView:
     + xexchange::WrapperModule
     + hatom::WrapperModule
     + tinder::WrapperModule
+    + hatomliquidstaking::WrapperModule
 {
     #[init]
     fn init(&self) {}

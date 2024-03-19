@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                           12
+// Endpoints:                            2
 // Async Callback (empty):               1
-// Total number of exported functions:  14
+// Total number of exported functions:   4
 
 #![no_std]
 #![allow(internal_features)]
@@ -21,17 +21,7 @@ multiversx_sc_wasm_adapter::endpoints! {
     (
         init => init
         aggregate => aggregate
-        getClaimabeProtocolFee => get_claimable_protocol_fee
-        registerProtocolFee => register_protocol_fee
-        getClaimabeAshswapFee => get_claimable_ashswap_fee
-        getAshswapFeeAddress => ashswap_fee_address
-        registerAshswapFee => register_ashswap_fee
-        getProtocolFeePercent => protocol_fee_percent
-        getAshswapFeePercent => ashswap_fee_percent
-        claimProtocolFee => claim_protocol_fee
-        claimProtocolFeeByTokens => claim_protocol_fee_by_tokens
-        claimAshswapFee => claim_ashswap_fee
-        claimAshswapFeeByTokens => claim_ashswap_fee_by_tokens
+        getFeeAddress => fee_address
     )
 }
 

@@ -2,6 +2,7 @@ aggregator::deploy() {
     eval "mxpy contract deploy $CALL_ARGS \
         --gas-limit=150000000 \
         --metadata-payable \
+        --arguments $FEE_ADDRESS_DECODE \
         --bytecode='$MY_PARENT_DIR/dex/aggregator/output/aggregator.wasm' \
         --outfile='deploy-aggregator.interaction.json'" 1>/dev/null
 
@@ -17,12 +18,11 @@ aggregator::deploy() {
 }
 
 aggregator::upgrade() {
-    address="0x$(mxpy wallet bech32 --decode $EGLD_WRAPPER_CONTRACT)"
-    token="0x$(echo -n $WEGLD_TOKEN_ID | xxd -p -u | tr -d '\n')"
+    address="0x$(mxpy wallet bech32 --decode $FEE_CONTRACT)"
     eval "mxpy contract upgrade $AGGREGATOR_ADDRESS $CALL_ARGS \
         --gas-limit=500000000 \
         --metadata-payable \
-        --arguments $address $token \
+        --arguments $address \
         --bytecode='$MY_PARENT_DIR/dex/aggregator/output/aggregator.wasm'" 1>/dev/null
 }
 

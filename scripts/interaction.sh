@@ -8,6 +8,7 @@ source "$MY_DIR/mod/utils.sh"
 source "$MY_DIR/mod/load_env.sh"
 source "$MY_DIR/mod/wrapper.sh"
 source "$MY_DIR/mod/aggregator.sh"
+source "$MY_DIR/mod/fee.sh"
 
 ## Select env
 case $1 in

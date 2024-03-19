@@ -33,6 +33,7 @@ version = "0.0.0"
 dependencies = [
  "common-errors",
  "common-structs",
+ "fee",
  "multiversx-sc",
  "token_send",
 ]
@@ -419,6 +420,7 @@ dependencies = [
  "aggregator",
  "common-errors",
  "common-structs",
+ "fee",
  "multiversx-sc",
  "multiversx-sc-scenario",
  "num-bigint",
@@ -510,6 +512,26 @@ name = "fastrand"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25cbce373ec4653f1a01a31e8a5e5ec0c622dc27ff9c4e6606eefef5cbbed4a5"
+
+[[package]]
+name = "fee"
+version = "0.0.0"
+dependencies = [
+ "common-errors",
+ "common-structs",
+ "multiversx-sc",
+ "multiversx-sc-scenario",
+ "num-bigint",
+ "token_send",
+]
+
+[[package]]
+name = "fee-meta"
+version = "0.0.0"
+dependencies = [
+ "fee",
+ "multiversx-sc-meta",
+]
 
 [[package]]
 name = "flate2"

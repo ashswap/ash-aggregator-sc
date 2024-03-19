@@ -22,6 +22,8 @@ load_deployed_data() {
     [ ! -z "$WRAPPER_ADDRESS" ] && WRAPPER_ADDRESS_DECODE="0x$(mxpy wallet bech32 --decode $WRAPPER_ADDRESS)"
     AGGREGATOR_ADDRESS=$(mxpy data load --partition $CHAIN_ID --key=aggregator-address)
     [ ! -z "$AGGREGATOR_ADDRESS" ] && AGGREGATOR_ADDRESS_DECODE="0x$(mxpy wallet bech32 --decode $AGGREGATOR_ADDRESS)"
+    FEE_ADDRESS=$(mxpy data load --partition $CHAIN_ID --key=fee-address)
+    [ ! -z "$FEE_ADDRESS" ] && FEE_ADDRESS_DECODE="0x$(mxpy wallet bech32 --decode $FEE_ADDRESS)"
 }
 
 load() {

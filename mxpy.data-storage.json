@@ -1,9 +1,11 @@
 {
     "D1": {
-        "wrapper-address": "erd1qqqqqqqqqqqqqpgq78mwlwg62mdzw78xmwe46kemcangrauqh2us56kxz5",
-        "wrapper-deploy-tx": "55fec50db2f6655f0608f631326a0d0307fc44affd8c7674ec704075bb785964",
-        "aggregator-address": "erd1qqqqqqqqqqqqqpgqvzupy3y6h6rtc8jhtel4xcg0n5r2vmv5h2uss509am",
-        "aggregator-deploy-tx": "8a7b30724ee86fdda74da29109e8cf0bdc13ec8403630b5f5152cca853cc58b9"
+        "wrapper-address": "erd1qqqqqqqqqqqqqpgq6q7fe23390lmfmd8877exq0jpyzp7zpnh2usqs5j3c",
+        "wrapper-deploy-tx": "0fc2bcc5b1d640b79f668700b0938a4964a2c55968d0ce8e9a47cd289eb2dddd",
+        "aggregator-address": "erd1qqqqqqqqqqqqqpgqqwmpyvgu6htky6a37nvuds4aemzzmw7vh2uscqf7jv",
+        "aggregator-deploy-tx": "01ba92fcb189309a7d52dc7d55a7785cc10cd4c688f8591a016216e9232d070c",
+        "fee-deploy-tx": "da0ae43972e9a7230bb7296a6d052e0aabc404dac1f4385661160a6dafaa0e2a",
+        "fee-address": "erd1qqqqqqqqqqqqqpgq8myeq32fxxxp8pwnqzkuf09nqmfwjj2yh2usr73h3c"
     },
     "D": {
         "wrapper-address": "erd1qqqqqqqqqqqqqpgq2hsjek6vch649k3kppg0t4v2767c6jaqh2us5qj2h6",

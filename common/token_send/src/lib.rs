@@ -1,7 +1,5 @@
 #![no_std]
 
-pub mod proxy;
-
 multiversx_sc::imports!();
 multiversx_sc::derive_imports!();
 
@@ -13,7 +11,6 @@ pub struct EgldWrapperOption<M: ManagedTypeApi> {
 
 #[multiversx_sc::module]
 pub trait TokenSendModule {
-
     fn send_multiple_tokens_if_not_zero(&self, destination: &ManagedAddress, payments: &ManagedVec<EsdtTokenPayment>) -> ManagedVec<EsdtTokenPayment> {
         let mut non_zero_payments = ManagedVec::new();
         for payment in payments {

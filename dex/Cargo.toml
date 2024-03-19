@@ -18,6 +18,9 @@ version = "0.47.5"
 [dev-dependencies.aggregator]
 path = "aggregator"
 
+[dev-dependencies.fee]
+path = "fee"
+
 [dev-dependencies.common-errors]
 path = "../common/errors"
 

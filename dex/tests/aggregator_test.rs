@@ -1,5 +1,6 @@
 #![allow(deprecated)]
 use aggregator::*;
+use fee::*;
 use common_errors::*;
 use common_structs::*;
 use multiversx_sc::{codec::multi_types::OptionalValue, types::*};
@@ -25,6 +26,7 @@ struct TestAggregatorStep {
 
 const AGGREGATOR_WASM_PATH: &'static str = "aggregator/output/aggregator.wasm";
 const WRAPPER_MOCK_WASM_PATH: &'static str = "wrapper-mock/output/wrapper-mock.wasm";
+const FEE_WASM_PATH: &'static str = "fee/output/fee.wasm";
 
 const USDC_TOKEN_ID: &[u8] = b"USDC-abcdef";
 const USDT_TOKEN_ID: &[u8] = b"USDT-abcdef";
@@ -32,17 +34,19 @@ const BUSD_TOKEN_ID: &[u8] = b"BUSD-abcdef";
 const USER_TOTAL_TOKENS: u64 = 5_000_000_000;
 const WRAPPED_EGLD_TOKEN_ID: &[u8] = b"WEGLD-abcdef";
 
-struct AggregatorSetup<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder>
+struct AggregatorSetup<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder, FeeObjBuilder>
 where
     ProtocolObjBuilder: 'static + Copy + Fn() -> protocol_mock::ContractObj<DebugApi>,
     WrapperObjBuilder: 'static + Copy + Fn() -> wrapper_mock::ContractObj<DebugApi>,
     AggregatorObjBuilder: 'static + Copy + Fn() -> aggregator::ContractObj<DebugApi>,
+    FeeObjBuilder: 'static + Copy + Fn() -> fee::ContractObj<DebugApi>,
 {
     pub blockchain_wrapper: BlockchainStateWrapper,
     pub user_address: Address,
     pub mock_wrapper: ContractObjWrapper<protocol_mock::ContractObj<DebugApi>, ProtocolObjBuilder>,
     pub wrapper_wrapper: ContractObjWrapper<wrapper_mock::ContractObj<DebugApi>, WrapperObjBuilder>,
     pub agg_wrapper: ContractObjWrapper<aggregator::ContractObj<DebugApi>, AggregatorObjBuilder>,
+    pub fee_wrapper: ContractObjWrapper<fee::ContractObj<DebugApi>, FeeObjBuilder>,
 }
 
 fn set_esdt_balance(blockchain_wrapper: &mut BlockchainStateWrapper, address: &Address) {
@@ -56,15 +60,17 @@ fn set_esdt_balance(blockchain_wrapper: &mut BlockchainStateWrapper, address: &A
     }
 }
 
-fn setup_aggregator<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder>(
+fn setup_aggregator<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder, FeeObjBuilder>(
     mock_builder: ProtocolObjBuilder,
     wrapper_mock_builder: WrapperObjBuilder,
     agg_builder: AggregatorObjBuilder,
-) -> AggregatorSetup<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder>
+    fee_builder: FeeObjBuilder,
+) -> AggregatorSetup<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder, FeeObjBuilder>
 where
     ProtocolObjBuilder: 'static + Copy + Fn() -> protocol_mock::ContractObj<DebugApi>,
     WrapperObjBuilder: 'static + Copy + Fn() -> wrapper_mock::ContractObj<DebugApi>,
     AggregatorObjBuilder: 'static + Copy + Fn() -> aggregator::ContractObj<DebugApi>,
+    FeeObjBuilder: 'static + Copy + Fn() -> fee::ContractObj<DebugApi>,
 {
     let rust_zero = rust_biguint!(0u64);
     let mut blockchain_wrapper = BlockchainStateWrapper::new();
@@ -98,6 +104,13 @@ where
         AGGREGATOR_WASM_PATH,
     );
 
+    let fee_wrapper = blockchain_wrapper.create_sc_account(
+        &rust_zero,
+        Some(&owner_addr),
+        fee_builder,
+        FEE_WASM_PATH,
+    );
+
     blockchain_wrapper
         .execute_tx(&owner_addr, &mock_wrapper_wrapper, &rust_zero, |sc| {
             sc.init(WRAPPED_EGLD_TOKEN_ID.into());
@@ -106,7 +119,7 @@ where
 
     blockchain_wrapper
         .execute_tx(&owner_addr, &agg_wrapper, &rust_zero, |sc| {
-            sc.init();
+            sc.init(managed_address!(&fee_wrapper.address_ref().clone()));
         })
         .assert_ok();
 
@@ -119,6 +132,7 @@ where
         mock_wrapper,
         wrapper_wrapper: mock_wrapper_wrapper,
         agg_wrapper,
+        fee_wrapper
     }
 }
 
@@ -131,13 +145,14 @@ fn parse_biguint(str: &str) -> RustBigUint {
     RustBigUint::parse_bytes(str_without_underscores.as_bytes(), 10).unwrap()
 }
 
-fn check_result<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder>(
-    agg_setup: &mut AggregatorSetup<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder>,
+fn check_result<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder, FeeObjBuilder>(
+    agg_setup: &mut AggregatorSetup<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder, FeeObjBuilder>,
     expected_balances: Vec<TestTokenAmount>,
 ) where
     ProtocolObjBuilder: 'static + Copy + Fn() -> protocol_mock::ContractObj<DebugApi>,
     WrapperObjBuilder: 'static + Copy + Fn() -> wrapper_mock::ContractObj<DebugApi>,
     AggregatorObjBuilder: 'static + Copy + Fn() -> aggregator::ContractObj<DebugApi>,
+    FeeObjBuilder: 'static + Copy + Fn() -> fee::ContractObj<DebugApi>,
 {
     for expected in expected_balances {
         agg_setup.blockchain_wrapper.check_esdt_balance(
@@ -148,21 +163,22 @@ fn check_result<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder>(
     }
 }
 
-fn check_result_egld<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder>(
-    agg_setup: &mut AggregatorSetup<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder>,
+fn check_result_egld<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder, FeeObjBuilder>(
+    agg_setup: &mut AggregatorSetup<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder, FeeObjBuilder>,
     expected_balance: RustBigUint,
 ) where
     ProtocolObjBuilder: 'static + Copy + Fn() -> protocol_mock::ContractObj<DebugApi>,
     WrapperObjBuilder: 'static + Copy + Fn() -> wrapper_mock::ContractObj<DebugApi>,
     AggregatorObjBuilder: 'static + Copy + Fn() -> aggregator::ContractObj<DebugApi>,
+    FeeObjBuilder: 'static + Copy + Fn() -> fee::ContractObj<DebugApi>,
 {
     agg_setup
         .blockchain_wrapper
         .check_egld_balance(&agg_setup.user_address, &expected_balance);
 }
 
-fn aggregate<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder>(
-    agg_setup: &mut AggregatorSetup<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder>,
+fn aggregate<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder, FeeObjBuilder>(
+    agg_setup: &mut AggregatorSetup<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder, FeeObjBuilder>,
     token_in: &[u8],
     token_out: &[u8],
     test_steps: Vec<TestAggregatorStep>,
@@ -174,6 +190,7 @@ where
     ProtocolObjBuilder: 'static + Copy + Fn() -> protocol_mock::ContractObj<DebugApi>,
     WrapperObjBuilder: 'static + Copy + Fn() -> wrapper_mock::ContractObj<DebugApi>,
     AggregatorObjBuilder: 'static + Copy + Fn() -> aggregator::ContractObj<DebugApi>,
+    FeeObjBuilder: 'static + Copy + Fn() -> fee::ContractObj<DebugApi>,
 {
     if payment.token_identifier == b"egld" {
         agg_setup.blockchain_wrapper.execute_tx(
@@ -337,6 +354,7 @@ fn test_aggregate_simple() {
         protocol_mock::contract_obj,
         wrapper_mock::contract_obj,
         aggregator::contract_obj,
+        fee::contract_obj,
     );
     let mock_address = agg_setup.mock_wrapper.address_ref().clone();
     let amount = 1_000_000;
@@ -513,6 +531,7 @@ fn test_aggregate_error() {
         protocol_mock::contract_obj,
         wrapper_mock::contract_obj,
         aggregator::contract_obj,
+        fee::contract_obj,
     );
     let mock_address = agg_setup.mock_wrapper.address_ref().clone();
     let amount = 1_000_000;
@@ -606,6 +625,7 @@ fn test_aggregate_error_invalid_amount_in_step() {
         protocol_mock::contract_obj,
         wrapper_mock::contract_obj,
         aggregator::contract_obj,
+        fee::contract_obj,
     );
     let mock_address = agg_setup.mock_wrapper.address_ref().clone();
     let amount = 1_000_000;

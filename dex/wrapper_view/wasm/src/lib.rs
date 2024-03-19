@@ -5,9 +5,9 @@
 ////////////////////////////////////////////////////
 
 // Init:                                 1
-// Endpoints:                            7
+// Endpoints:                            8
 // Async Callback (empty):               1
-// Total number of exported functions:   9
+// Total number of exported functions:  10
 
 #![no_std]
 #![allow(internal_features)]
@@ -27,6 +27,7 @@ multiversx_sc_wasm_adapter::endpoints! {
         getXExchange => get_xexchange
         getHatom => get_hatom
         getTinder => get_tinder
+        getHatomLiquidStaking => get_hatom_liquid_staking
     )
 }
 
