@@ -9,11 +9,11 @@ publish = false
 num-bigint = "0.4.2"
 
 [dependencies.multiversx-sc]
-version = "0.47.5"
+version = "0.47.7"
 features = ["esdt-token-payment-legacy-decode"]
 
 [dev-dependencies.multiversx-sc-scenario]
-version = "0.47.5"
+version = "0.47.7"
 
 [dev-dependencies.aggregator]
 path = "aggregator"

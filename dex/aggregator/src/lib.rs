@@ -41,7 +41,7 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         match protocol {
             OptionalValue::Some(protocol_addr) => {
                 let fee_sc_address = self.fee_address().get();
-                let (ash_fee, protocol_fee) = self.fee_contract_proxy(fee_sc_address.clone()).calculate_fee(&amount_in, &protocol_addr).execute_on_dest_context_readonly::<(BigUint, BigUint)>();
+                let (ash_fee, protocol_fee) = self.fee_contract_proxy(fee_sc_address.clone()).calculate_fee(&amount_in, &protocol_addr).execute_on_dest_context::<(BigUint, BigUint)>();
                 let _: IgnoreValue = self
                     .fee_contract_proxy(fee_sc_address)
                     .charge_fee(&protocol_addr, &ash_fee, &protocol_fee)

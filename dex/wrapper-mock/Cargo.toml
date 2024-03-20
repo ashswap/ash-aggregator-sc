@@ -9,5 +9,5 @@ publish = false
 path = "src/lib.rs"
 
 [dependencies.multiversx-sc]
-version = "0.47.5"
+version = "0.47.7"
 features = ["esdt-token-payment-legacy-decode"]

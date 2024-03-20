@@ -9,7 +9,7 @@ publish = false
 path = "src/fee.rs"
 
 [dependencies.multiversx-sc]
-version = "0.47.5"
+version = "0.47.7"
 features = ["esdt-token-payment-legacy-decode"]
 
 [dev-dependencies]
@@ -25,4 +25,4 @@ path = "../../common/structs"
 path = "../../common/token_send"
 
 [dev-dependencies.multiversx-sc-scenario]
-version = "0.47.5"
+version = "0.47.7"

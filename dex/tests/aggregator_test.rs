@@ -3,7 +3,7 @@ use aggregator::*;
 use fee::*;
 use common_errors::*;
 use common_structs::*;
-use multiversx_sc::{codec::multi_types::OptionalValue, types::*};
+use multiversx_sc::{codec::multi_types::OptionalValue, require, types::*};
 use multiversx_sc_scenario::{multiversx_chain_vm::tx_mock::TxContextRef, testing_framework::*, *};
 use wrapper_mock::EgldWrapperMock;
 pub mod protocol_mock;
@@ -978,3 +978,581 @@ fn test_aggregate_error_invalid_amount_in_step() {
     ).assert_user_error(ERROR_INVALID_TOKEN_IN);
 }
 
+#[test]
+fn test_fee_simple(){
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+        fee::contract_obj,
+    );
+    let protocol_address =
+        agg_setup.blockchain_wrapper.create_user_account(&rust_biguint!(1_000_000_000_000_000_000));
+    let ashswap_address =
+        agg_setup.blockchain_wrapper.create_user_account(&rust_biguint!(1_000_000_000_000_000_000));
+    agg_setup.blockchain_wrapper.execute_tx(
+        &agg_setup.user_address, 
+        &agg_setup.fee_wrapper, 
+        &rust_biguint!(0), 
+        |sc| {
+            sc.register_ashswap_fee(50_000u64, managed_address!(&ashswap_address)); // 50%
+            sc.register_protocol_fee(10_000u64, managed_address!(&protocol_address)); // 10%
+            let ashswap_percent = sc.ashswap_fee_percent().get();
+            assert_eq!(ashswap_percent, 50_000u64);
+            let protocol_percent = sc.protocol_fee_percent(managed_address!(&protocol_address)).get();
+            assert_eq!(protocol_percent, 10_000u64);
+        }
+    ).assert_ok();
+    let mock_address = agg_setup.mock_wrapper.address_ref().clone();
+    let amount = 1_000_000;
+
+    let test_steps = vec![TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(),
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount * 9 / 10), // charge 10% fee
+        pool_address: mock_address.clone(),
+    }];
+
+    let expected_balances = vec![
+        TestTokenAmount {
+            token: USDC_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(USER_TOTAL_TOKENS - amount),
+        },
+        TestTokenAmount {
+            token: BUSD_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(USER_TOTAL_TOKENS + amount * 9 / 10 * 95 / 100),
+        },
+    ];
+
+    aggregate(
+        &mut agg_setup,
+        USDC_TOKEN_ID,
+        BUSD_TOKEN_ID,
+        test_steps, 
+        rust_biguint!(0), 
+        Option::Some(&protocol_address),
+        TxTokenTransfer {
+            token_identifier: USDC_TOKEN_ID.to_vec(),
+            nonce: 0,
+            value: rust_biguint!(amount),
+        }
+    ).assert_ok();
+    check_result(&mut agg_setup, expected_balances);
+    agg_setup.blockchain_wrapper.check_esdt_balance(
+        &agg_setup.fee_wrapper.address_ref().clone(),
+        &USDC_TOKEN_ID,
+        &rust_biguint!(amount / 10),
+    );
+    let expected_protocol_fee = vec![
+        TestTokenAmount {
+            token: USDC_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(amount / 10 / 2),
+        },
+    ];
+    let expected_ashswap_fee = vec![
+        TestTokenAmount {
+            token: USDC_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(amount / 10 / 2),
+        },
+    ];
+    agg_setup.blockchain_wrapper.execute_query(
+        &agg_setup.fee_wrapper, 
+        |sc| {
+            let protocol_fee = sc.get_claimable_protocol_fee(managed_address!(&protocol_address), 0u64, 100u64);
+            let mut i = 0;
+            for fee in protocol_fee.into_iter() {
+                assert_eq!(fee.amount, to_managed_biguint(expected_protocol_fee[i].amount.clone()));
+                i += 1;
+            }
+            i = 0;
+            let ashswap_fee = sc.get_claimable_ashswap_fee(0u64, 100u64);
+            for fee in ashswap_fee.into_iter() {
+                assert_eq!(fee.amount, to_managed_biguint(expected_ashswap_fee[i].amount.clone()));
+                i += 1;
+            }
+        }
+    ).assert_ok();
+    agg_setup.blockchain_wrapper.execute_tx(
+        &agg_setup.user_address, 
+        &agg_setup.fee_wrapper, 
+        &rust_biguint!(0), 
+        |sc| {
+            sc.claim_protocol_fee(managed_address!(&protocol_address));
+            sc.claim_ashswap_fee();
+        }
+    ).assert_ok();
+    // balance of fee contract should be 0
+    agg_setup.blockchain_wrapper.check_esdt_balance(
+        &agg_setup.fee_wrapper.address_ref().clone(),
+        &USDC_TOKEN_ID,
+        &rust_biguint!(0),
+    );
+    // balance of protocol and ashswap should be updated
+    agg_setup.blockchain_wrapper.check_esdt_balance(
+        &protocol_address.clone(),
+        &USDC_TOKEN_ID,
+        &rust_biguint!(amount / 10 / 2),
+    );
+    agg_setup.blockchain_wrapper.check_esdt_balance(
+        &ashswap_address.clone(),
+        &USDC_TOKEN_ID,
+        &rust_biguint!(amount / 10 / 2),
+    );
+}
+
+#[test]
+fn test_fee_accummulated() {
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+        fee::contract_obj,
+    );
+    let protocol_address =
+        agg_setup.blockchain_wrapper.create_user_account(&rust_biguint!(1_000_000_000_000_000_000));
+    let ashswap_address =
+        agg_setup.blockchain_wrapper.create_user_account(&rust_biguint!(1_000_000_000_000_000_000));
+    agg_setup.blockchain_wrapper.execute_tx(
+        &agg_setup.user_address, 
+        &agg_setup.fee_wrapper, 
+        &rust_biguint!(0), 
+        |sc| {
+            sc.register_ashswap_fee(50_000u64, managed_address!(&ashswap_address)); // 50%
+            sc.register_protocol_fee(10_000u64, managed_address!(&protocol_address)); // 10%
+            let ashswap_percent = sc.ashswap_fee_percent().get();
+            assert_eq!(ashswap_percent, 50_000u64);
+            let protocol_percent = sc.protocol_fee_percent(managed_address!(&protocol_address)).get();
+            assert_eq!(protocol_percent, 10_000u64);
+        }
+    ).assert_ok();
+    let mock_address = agg_setup.mock_wrapper.address_ref().clone();
+    let amount = 1_000_000;
+
+    let test_steps = vec![TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(),
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount * 9 / 10), // charge 10% fee
+        pool_address: mock_address.clone(),
+    }];
+
+    aggregate(
+        &mut agg_setup,
+        USDC_TOKEN_ID,
+        BUSD_TOKEN_ID,
+        test_steps.clone(), 
+        rust_biguint!(0), 
+        Option::Some(&protocol_address),
+        TxTokenTransfer {
+            token_identifier: USDC_TOKEN_ID.to_vec(),
+            nonce: 0,
+            value: rust_biguint!(amount),
+        }
+    ).assert_ok();
+    aggregate(
+        &mut agg_setup,
+        USDC_TOKEN_ID,
+        BUSD_TOKEN_ID,
+        test_steps, 
+        rust_biguint!(0), 
+        Option::Some(&protocol_address),
+        TxTokenTransfer {
+            token_identifier: USDC_TOKEN_ID.to_vec(),
+            nonce: 0,
+            value: rust_biguint!(amount),
+        }
+    ).assert_ok();
+    agg_setup.blockchain_wrapper.execute_tx(
+        &agg_setup.user_address, 
+        &agg_setup.fee_wrapper, 
+        &rust_biguint!(0), 
+        |sc| {
+            sc.claim_protocol_fee(managed_address!(&protocol_address));
+            sc.claim_ashswap_fee();
+        }
+    ).assert_ok();
+    // balance of fee contract should be 0
+    agg_setup.blockchain_wrapper.check_esdt_balance(
+        &agg_setup.fee_wrapper.address_ref().clone(),
+        &USDC_TOKEN_ID,
+        &rust_biguint!(0),
+    );
+    // balance of protocol and ashswap should be updated
+    agg_setup.blockchain_wrapper.check_esdt_balance(
+        &protocol_address.clone(),
+        &USDC_TOKEN_ID,
+        &rust_biguint!(amount / 10),
+    );
+    agg_setup.blockchain_wrapper.check_esdt_balance(
+        &ashswap_address.clone(),
+        &USDC_TOKEN_ID,
+        &rust_biguint!(amount / 10),
+    );
+}
+
+#[test]
+fn test_fee_accummulated_2_tokens() {
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+        fee::contract_obj,
+    );
+    let protocol_address =
+        agg_setup.blockchain_wrapper.create_user_account(&rust_biguint!(1_000_000_000_000_000_000));
+    let ashswap_address =
+        agg_setup.blockchain_wrapper.create_user_account(&rust_biguint!(1_000_000_000_000_000_000));
+    agg_setup.blockchain_wrapper.execute_tx(
+        &agg_setup.user_address, 
+        &agg_setup.fee_wrapper, 
+        &rust_biguint!(0), 
+        |sc| {
+            sc.register_ashswap_fee(50_000u64, managed_address!(&ashswap_address)); // 50%
+            sc.register_protocol_fee(10_000u64, managed_address!(&protocol_address)); // 10%
+            let ashswap_percent = sc.ashswap_fee_percent().get();
+            assert_eq!(ashswap_percent, 50_000u64);
+            let protocol_percent = sc.protocol_fee_percent(managed_address!(&protocol_address)).get();
+            assert_eq!(protocol_percent, 10_000u64);
+        }
+    ).assert_ok();
+    let mock_address = agg_setup.mock_wrapper.address_ref().clone();
+    let amount = 1_000_000;
+
+    let test_steps = vec![TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(),
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount * 9 / 10), // charge 10% fee
+        pool_address: mock_address.clone(),
+    }];
+
+    aggregate(
+        &mut agg_setup,
+        USDC_TOKEN_ID,
+        BUSD_TOKEN_ID,
+        test_steps.clone(), 
+        rust_biguint!(0), 
+        Option::Some(&protocol_address),
+        TxTokenTransfer {
+            token_identifier: USDC_TOKEN_ID.to_vec(),
+            nonce: 0,
+            value: rust_biguint!(amount),
+        }
+    ).assert_ok();
+    aggregate(
+        &mut agg_setup,
+        USDC_TOKEN_ID,
+        BUSD_TOKEN_ID,
+        test_steps, 
+        rust_biguint!(0), 
+        Option::Some(&protocol_address),
+        TxTokenTransfer {
+            token_identifier: USDC_TOKEN_ID.to_vec(),
+            nonce: 0,
+            value: rust_biguint!(amount),
+        }
+    ).assert_ok();
+    let test_steps = vec![TestAggregatorStep {
+        token_in: USDT_TOKEN_ID.to_vec(),
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount * 9 / 10), // charge 10% fee
+        pool_address: mock_address.clone(),
+    }];
+    aggregate(
+        &mut agg_setup,
+        USDT_TOKEN_ID,
+        BUSD_TOKEN_ID,
+        test_steps, 
+        rust_biguint!(0), 
+        Option::Some(&protocol_address),
+        TxTokenTransfer {
+            token_identifier: USDT_TOKEN_ID.to_vec(),
+            nonce: 0,
+            value: rust_biguint!(amount),
+        }
+    ).assert_ok();
+
+    // check claimable amount
+    let expected_protocol_fee = vec![
+        TestTokenAmount {
+            token: USDC_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(amount / 10),
+        },
+        TestTokenAmount {
+            token: USDT_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(amount / 10 / 2),
+        },
+    ];
+    let expected_ashswap_fee = vec![
+        TestTokenAmount {
+            token: USDC_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(amount / 10),
+        },
+        TestTokenAmount {
+            token: USDT_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(amount / 10 / 2),
+        },
+    ];
+    agg_setup.blockchain_wrapper.execute_query(
+        &agg_setup.fee_wrapper, 
+        |sc| {
+            let protocol_fee = sc.get_claimable_protocol_fee(managed_address!(&protocol_address), 0u64, 100u64);
+            let mut i = 0;
+            for fee in protocol_fee.into_iter() {
+                assert_eq!(fee.amount, to_managed_biguint(expected_protocol_fee[i].amount.clone()));
+                i += 1;
+            }
+            i = 0;
+            let ashswap_fee = sc.get_claimable_ashswap_fee(0u64, 100u64);
+            for fee in ashswap_fee.into_iter() {
+                assert_eq!(fee.amount, to_managed_biguint(expected_ashswap_fee[i].amount.clone()));
+                i += 1;
+            }
+        }
+    ).assert_ok();
+
+    agg_setup.blockchain_wrapper.execute_tx(
+        &agg_setup.user_address, 
+        &agg_setup.fee_wrapper, 
+        &rust_biguint!(0), 
+        |sc| {
+            sc.claim_protocol_fee(managed_address!(&protocol_address));
+            sc.claim_ashswap_fee();
+        }
+    ).assert_ok();
+    
+    // claimable amount must = 0
+    agg_setup.blockchain_wrapper.execute_query(
+        &agg_setup.fee_wrapper, 
+        |sc| {
+            let protocol_fee = sc.get_claimable_protocol_fee(managed_address!(&protocol_address), 0u64, 100u64);
+            let mut i = 0;
+            for fee in protocol_fee.into_iter() {
+                assert_eq!(fee.amount, managed_biguint!(0));
+                i += 1;
+            }
+            i = 0;
+            let ashswap_fee = sc.get_claimable_ashswap_fee(0u64, 100u64);
+            for fee in ashswap_fee.into_iter() {
+                assert_eq!(fee.amount, managed_biguint!(0));
+                i += 1;
+            }
+        }
+    ).assert_ok();
+    // balance of fee contract should be 0
+    agg_setup.blockchain_wrapper.check_esdt_balance(
+        &agg_setup.fee_wrapper.address_ref().clone(),
+        &USDC_TOKEN_ID,
+        &rust_biguint!(0),
+    );
+    agg_setup.blockchain_wrapper.check_esdt_balance(
+        &agg_setup.fee_wrapper.address_ref().clone(),
+        &USDT_TOKEN_ID,
+        &rust_biguint!(0),
+    );
+    // balance of protocol and ashswap should be updated
+    agg_setup.blockchain_wrapper.check_esdt_balance(
+        &protocol_address.clone(),
+        &USDC_TOKEN_ID,
+        &rust_biguint!(amount / 10),
+    );
+    agg_setup.blockchain_wrapper.check_esdt_balance(
+        &ashswap_address.clone(),
+        &USDT_TOKEN_ID,
+        &rust_biguint!(amount / 10 / 2),
+    );
+    agg_setup.blockchain_wrapper.check_esdt_balance(
+        &ashswap_address.clone(),
+        &USDT_TOKEN_ID,
+        &rust_biguint!(amount / 10 / 2),
+    );
+}
+
+#[test]
+fn test_fee_1_esdt_1_egld() {
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+        fee::contract_obj,
+    );
+    let protocol_address =
+        agg_setup.blockchain_wrapper.create_user_account(&rust_biguint!(0));
+    let ashswap_address =
+        agg_setup.blockchain_wrapper.create_user_account(&rust_biguint!(0));
+    agg_setup.blockchain_wrapper.execute_tx(
+        &agg_setup.user_address, 
+        &agg_setup.fee_wrapper, 
+        &rust_biguint!(0), 
+        |sc| {
+            sc.register_ashswap_fee(50_000u64, managed_address!(&ashswap_address)); // 50%
+            sc.register_protocol_fee(10_000u64, managed_address!(&protocol_address)); // 10%
+            let ashswap_percent = sc.ashswap_fee_percent().get();
+            assert_eq!(ashswap_percent, 50_000u64);
+            let protocol_percent = sc.protocol_fee_percent(managed_address!(&protocol_address)).get();
+            assert_eq!(protocol_percent, 10_000u64);
+        }
+    ).assert_ok();
+    let mock_address = agg_setup.mock_wrapper.address_ref().clone();
+    let amount = 1_000_000;
+
+    let test_steps = vec![TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(),
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount * 9 / 10), // charge 10% fee
+        pool_address: mock_address.clone(),
+    }];
+
+    aggregate(
+        &mut agg_setup,
+        USDC_TOKEN_ID,
+        BUSD_TOKEN_ID,
+        test_steps.clone(), 
+        rust_biguint!(0), 
+        Option::Some(&protocol_address),
+        TxTokenTransfer {
+            token_identifier: USDC_TOKEN_ID.to_vec(),
+            nonce: 0,
+            value: rust_biguint!(amount),
+        }
+    ).assert_ok();
+
+    let test_steps = vec![TestAggregatorStep {
+        token_in: b"EGLD".to_vec(),
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount * 9 / 10), // charge 10% fee
+        pool_address: mock_address.clone(),
+    }];
+    aggregate(
+        &mut agg_setup,
+        b"EGLD",
+        BUSD_TOKEN_ID,
+        test_steps, 
+        rust_biguint!(0), 
+        Option::Some(&protocol_address),
+        TxTokenTransfer {
+            token_identifier: b"EGLD".to_vec(),
+            nonce: 0,
+            value: rust_biguint!(amount),
+        }
+    ).assert_ok();
+    agg_setup.blockchain_wrapper.execute_tx(
+        &agg_setup.user_address, 
+        &agg_setup.fee_wrapper, 
+        &rust_biguint!(0), 
+        |sc| {
+            sc.claim_protocol_fee(managed_address!(&protocol_address));
+            sc.claim_ashswap_fee();
+        }
+    ).assert_ok();
+    // balance of fee contract should be 0
+    agg_setup.blockchain_wrapper.check_esdt_balance(
+        &agg_setup.fee_wrapper.address_ref().clone(),
+        &USDC_TOKEN_ID,
+        &rust_biguint!(0),
+    );
+    // balance of protocol and ashswap should be updated
+    agg_setup.blockchain_wrapper.check_esdt_balance(
+        &protocol_address.clone(),
+        &USDC_TOKEN_ID,
+        &rust_biguint!(amount / 10 / 2),
+    );
+    agg_setup.blockchain_wrapper.check_esdt_balance(
+        &ashswap_address.clone(),
+        &USDC_TOKEN_ID,
+        &rust_biguint!(amount / 10 / 2),
+    );
+    agg_setup.blockchain_wrapper.check_egld_balance(
+        &protocol_address.clone(),
+        &rust_biguint!(amount / 10 / 2),
+    );
+    agg_setup.blockchain_wrapper.check_egld_balance(
+        &protocol_address.clone(),
+        &rust_biguint!(amount / 10 / 2),
+    );
+}
+
+#[test]
+fn test_fee_2_procotols() {
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+        fee::contract_obj,
+    );
+    let protocol_address =
+        agg_setup.blockchain_wrapper.create_user_account(&rust_biguint!(1_000_000_000_000_000_000));
+    let protocol_2_address =
+        agg_setup.blockchain_wrapper.create_user_account(&rust_biguint!(1_000_000_000_000_000_000));
+    let ashswap_address =
+        agg_setup.blockchain_wrapper.create_user_account(&rust_biguint!(1_000_000_000_000_000_000));
+    agg_setup.blockchain_wrapper.execute_tx(
+        &agg_setup.user_address, 
+        &agg_setup.fee_wrapper, 
+        &rust_biguint!(0), 
+        |sc| {
+            sc.register_ashswap_fee(50_000u64, managed_address!(&ashswap_address)); // 50%
+            sc.register_protocol_fee(10_000u64, managed_address!(&protocol_address)); // 10%
+            sc.register_protocol_fee(10_000u64, managed_address!(&protocol_2_address)); // 10%
+        }
+    ).assert_ok();
+    let mock_address = agg_setup.mock_wrapper.address_ref().clone();
+    let amount = 1_000_000;
+
+    let test_steps = vec![TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(),
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount * 9 / 10), // charge 10% fee
+        pool_address: mock_address.clone(),
+    }];
+
+    aggregate(
+        &mut agg_setup,
+        USDC_TOKEN_ID,
+        BUSD_TOKEN_ID,
+        test_steps.clone(), 
+        rust_biguint!(0), 
+        Option::Some(&protocol_address),
+        TxTokenTransfer {
+            token_identifier: USDC_TOKEN_ID.to_vec(),
+            nonce: 0,
+            value: rust_biguint!(amount),
+        }
+    ).assert_ok();
+    aggregate(
+        &mut agg_setup,
+        USDC_TOKEN_ID,
+        BUSD_TOKEN_ID,
+        test_steps, 
+        rust_biguint!(0), 
+        Option::Some(&protocol_2_address),
+        TxTokenTransfer {
+            token_identifier: USDC_TOKEN_ID.to_vec(),
+            nonce: 0,
+            value: rust_biguint!(amount),
+        }
+    ).assert_ok();
+    agg_setup.blockchain_wrapper.execute_tx(
+        &agg_setup.user_address, 
+        &agg_setup.fee_wrapper, 
+        &rust_biguint!(0), 
+        |sc| {
+            sc.claim_protocol_fee(managed_address!(&protocol_address));
+            sc.claim_protocol_fee(managed_address!(&protocol_2_address));
+            sc.claim_ashswap_fee();
+        }
+    ).assert_ok();
+    agg_setup.blockchain_wrapper.check_esdt_balance(
+        &ashswap_address.clone(),
+        &USDC_TOKEN_ID,
+        &rust_biguint!(amount / 10),
+    );
+    agg_setup.blockchain_wrapper.check_esdt_balance(
+        &protocol_address.clone(),
+        &USDC_TOKEN_ID,
+        &rust_biguint!(amount / 10 / 2),
+    );
+    agg_setup.blockchain_wrapper.check_esdt_balance(
+        &protocol_2_address.clone(),
+        &USDC_TOKEN_ID,
+        &rust_biguint!(amount / 10 / 2),
+    );
+}
