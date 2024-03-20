@@ -79,7 +79,7 @@ where
         blockchain_wrapper.create_user_account(&rust_biguint!(1_000_000_000_000_000_000));
 
     let mock_wrapper = blockchain_wrapper.create_sc_account(
-        &rust_zero,
+        &rust_biguint!(1_000_000_000_000_000_000),
         Some(&owner_addr),
         mock_builder,
         AGGREGATOR_WASM_PATH,
@@ -192,7 +192,7 @@ where
     AggregatorObjBuilder: 'static + Copy + Fn() -> aggregator::ContractObj<DebugApi>,
     FeeObjBuilder: 'static + Copy + Fn() -> fee::ContractObj<DebugApi>,
 {
-    if payment.token_identifier == b"egld" {
+    if payment.token_identifier == b"EGLD" {
         agg_setup.blockchain_wrapper.execute_tx(
             &agg_setup.user_address, 
             &agg_setup.agg_wrapper, 
@@ -200,10 +200,22 @@ where
             |sc| {
                 let mut steps = ManagedVec::new();
                 for step in test_steps {
+                    let token_in;
+                    if step.token_in == b"EGLD" {
+                        token_in = managed_egld_token_id!();
+                    } else {
+                        token_in = managed_token_id_wrapped!(step.token_in);
+                    }
+                    let token_out;
+                    if step.token_out == b"EGLD" {
+                        token_out = managed_egld_token_id!();
+                    } else {
+                        token_out = managed_token_id_wrapped!(step.token_out.clone());
+                    }
                     let arguments = vec![managed_buffer!(&step.token_out)];
                     steps.push(AggregatorStep {
-                        token_in: managed_token_id_wrapped!(step.token_in),
-                        token_out: managed_token_id_wrapped!(step.token_out),
+                        token_in: token_in,
+                        token_out:token_out,
                         amount_in: to_managed_biguint(step.amount_in),
                         pool_address: managed_address!(&step.pool_address),
                         function_name: managed_buffer!(b"exchange"),
@@ -237,12 +249,30 @@ where
             0,
             &payment.value,
             |sc| {
+                let final_token_out;
+                if token_out == b"EGLD" {
+                    final_token_out = managed_egld_token_id!();
+                } else {
+                    final_token_out = managed_token_id_wrapped!(token_out);
+                }
                 let mut steps = ManagedVec::new();
                 for step in test_steps {
                     let arguments = vec![managed_buffer!(&step.token_out)];
+                    let token_in;
+                    if step.token_in == b"EGLD" {
+                        token_in = managed_egld_token_id!();
+                    } else {
+                        token_in = managed_token_id_wrapped!(step.token_in);
+                    }
+                    let token_out;
+                    if step.token_out == b"EGLD" {
+                        token_out = managed_egld_token_id!();
+                    } else {
+                        token_out = managed_token_id_wrapped!(step.token_out);
+                    }
                     steps.push(AggregatorStep {
-                        token_in: managed_token_id_wrapped!(step.token_in),
-                        token_out: managed_token_id_wrapped!(step.token_out),
+                        token_in: token_in,
+                        token_out: token_out,
                         amount_in: to_managed_biguint(step.amount_in),
                         pool_address: managed_address!(&step.pool_address),
                         function_name: managed_buffer!(b"exchange"),
@@ -252,7 +282,7 @@ where
                 if protocol.is_none() {
                     sc.aggregate(
                         managed_token_id_wrapped!(token_in),
-                        managed_token_id_wrapped!(token_out),
+                        final_token_out,
                         to_managed_biguint(limit),
                         steps,
                         OptionalValue::None,
@@ -260,7 +290,7 @@ where
                 } else {
                     sc.aggregate(
                         managed_token_id_wrapped!(token_in),
-                        managed_token_id_wrapped!(token_out),
+                        final_token_out,
                         to_managed_biguint(limit),
                         steps,
                         OptionalValue::Some(managed_address!(protocol.unwrap())),
@@ -270,83 +300,6 @@ where
         )
     }
 }
-
-// fn aggregate_v2<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder>(
-//     agg_setup: &mut AggregatorSetup<ProtocolObjBuilder, WrapperObjBuilder, AggregatorObjBuilder>,
-//     test_steps: Vec<TestAggregatorStep>,
-//     test_limits: Vec<TestTokenAmount>,
-//     egld_value: RustBigUint,
-//     payments: Vec<TxTokenTransfer>,
-//     return_egld: bool,
-//     protocol: OptionalValue<ManagedAddress<TxContextRef>>,
-// ) -> TxResult
-// where
-//     ProtocolObjBuilder: 'static + Copy + Fn() -> protocol_mock::ContractObj<DebugApi>,
-//     WrapperObjBuilder: 'static + Copy + Fn() -> wrapper_mock::ContractObj<DebugApi>,
-//     AggregatorObjBuilder: 'static + Copy + Fn() -> aggregator::ContractObj<DebugApi>,
-// {
-//     if egld_value == rust_biguint!(0) {
-//         agg_setup.blockchain_wrapper.execute_esdt_multi_transfer(
-//             &agg_setup.user_address,
-//             &agg_setup.agg_wrapper,
-//             &payments,
-//             |sc| {
-//                 let mut steps = ManagedVec::new();
-//                 for step in test_steps {
-//                     let arguments = vec![managed_buffer!(&step.token_out)];
-//                     steps.push(AggregatorStep {
-//                         token_in: managed_token_id!(step.token_in),
-//                         token_out: managed_token_id!(step.token_out),
-//                         amount_in: to_managed_biguint(step.amount_in),
-//                         pool_address: managed_address!(&step.pool_address),
-//                         function_name: managed_buffer!(b"exchange"),
-//                         arguments: ManagedVec::from(arguments),
-//                     });
-//                 }
-
-//                 let mut limits = ManagedVec::new();
-//                 for limit in test_limits {
-//                     limits.push(TokenAmount {
-//                         token: managed_token_id!(limit.token),
-//                         amount: to_managed_biguint(limit.amount),
-//                     });
-//                 }
-
-//                 sc.aggregate_esdt(steps, limits, return_egld, protocol);
-//             },
-//         )
-//     } else {
-//         agg_setup.blockchain_wrapper.execute_tx(
-//             &agg_setup.user_address,
-//             &agg_setup.agg_wrapper,
-//             &egld_value,
-//             |sc| {
-//                 let mut steps = ManagedVec::new();
-//                 for step in test_steps {
-//                     let arguments = vec![managed_buffer!(&step.token_out)];
-//                     steps.push(AggregatorStep {
-//                         token_in: managed_token_id!(step.token_in),
-//                         token_out: managed_token_id!(step.token_out),
-//                         amount_in: to_managed_biguint(step.amount_in),
-//                         pool_address: managed_address!(&step.pool_address),
-//                         function_name: managed_buffer!(b"exchange"),
-//                         arguments: ManagedVec::from(arguments),
-//                     });
-//                 }
-
-//                 let mut limits = ManagedVec::new();
-//                 for limit in test_limits {
-//                     limits.push(TokenAmount {
-//                         token: managed_token_id!(limit.token),
-//                         amount: to_managed_biguint(limit.amount),
-//                     });
-//                 }
-
-//                 sc.aggregate_egld(steps, limits, protocol);
-//             },
-//         )
-//     }
-// }
 
 #[test]
 fn test_aggregate_simple() {
@@ -397,136 +350,202 @@ fn test_aggregate_simple() {
     check_result(&mut agg_setup, expected_balances);
 }
 
-// #[test]
-// fn test_aggregate_simple_with_egld_return() {
-//     let mut agg_setup = setup_aggregator(
-//         protocol_mock::contract_obj,
-//         wrapper_mock::contract_obj,
-//         aggregator::contract_obj,
-//     );
-//     let mock_address = agg_setup.mock_wrapper.address_ref().clone();
-//     let amount = 1_000_000;
+#[test]
+fn test_aggregate_simple_egld() {
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+        fee::contract_obj,
+    );
+    let mock_address = agg_setup.mock_wrapper.address_ref().clone();
+    let amount = 1_000_000;
 
-//     let test_steps = vec![TestAggregatorStep {
-//         token_in: USDC_TOKEN_ID.to_vec(),
-//         token_out: WRAPPED_EGLD_TOKEN_ID.to_vec(),
-//         amount_in: rust_biguint!(amount),
-//         pool_address: mock_address.clone(),
-//     }];
+    let test_steps = vec![TestAggregatorStep {
+        token_in: b"EGLD".to_vec(),
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount),
+        pool_address: mock_address.clone(),
+    }];
 
-//     let test_limits = vec![
-//         TestTokenAmount {
-//             token: USDC_TOKEN_ID.to_vec(),
-//             amount: rust_biguint!(0),
-//         },
-//         TestTokenAmount {
-//             token: WRAPPED_EGLD_TOKEN_ID.to_vec(),
-//             amount: rust_biguint!(0),
-//         },
-//     ];
+    let expected_balances = vec![
+        TestTokenAmount {
+            token: BUSD_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(USER_TOTAL_TOKENS + amount * 95 / 100),
+        },
+    ];
 
-//     let payments = vec![TxTokenTransfer {
-//         token_identifier: USDC_TOKEN_ID.to_vec(),
-//         nonce: 0,
-//         value: rust_biguint!(amount),
-//     }];
-
-//     let expected_balances = vec![
-//         TestTokenAmount {
-//             token: USDC_TOKEN_ID.to_vec(),
-//             amount: rust_biguint!(USER_TOTAL_TOKENS - amount),
-//         },
-//         TestTokenAmount {
-//             token: USDT_TOKEN_ID.to_vec(),
-//             amount: rust_biguint!(USER_TOTAL_TOKENS),
-//         },
-//         TestTokenAmount {
-//             token: WRAPPED_EGLD_TOKEN_ID.to_vec(),
-//             amount: rust_biguint!(USER_TOTAL_TOKENS),
-//         },
-//     ];
-//     check_result_egld(&mut agg_setup, rust_biguint!(1_000_000_000_000_000_000));
-//     aggregate_v2(
-//         &mut agg_setup,
-//         test_steps,
-//         test_limits,
-//         rust_biguint!(0),
-//         payments,
-//         true,
-//         OptionalValue::None,
-//     )
-//     .assert_ok();
-//     check_result(&mut agg_setup, expected_balances);
-//     check_result_egld(
-//         &mut agg_setup,
-//         rust_biguint!(1_000_000_000_000_000_000 + amount * 95 / 100),
-//     )
-// }
-
-// #[test]
-// fn test_aggregate_simple_with_egld_input() {
-//     let mut agg_setup = setup_aggregator(
-//         protocol_mock::contract_obj,
-//         wrapper_mock::contract_obj,
-//         aggregator::contract_obj,
-//     );
-//     let mock_address = agg_setup.mock_wrapper.address_ref().clone();
-//     let amount = 1_000_000;
-
-//     let test_steps = vec![TestAggregatorStep {
-//         token_in: WRAPPED_EGLD_TOKEN_ID.to_vec(),
-//         token_out: USDC_TOKEN_ID.to_vec(),
-//         amount_in: rust_biguint!(amount),
-//         pool_address: mock_address.clone(),
-//     }];
-
-//     let test_limits = vec![
-//         TestTokenAmount {
-//             token: WRAPPED_EGLD_TOKEN_ID.to_vec(),
-//             amount: rust_biguint!(0),
-//         },
-//         TestTokenAmount {
-//             token: USDC_TOKEN_ID.to_vec(),
-//             amount: rust_biguint!(0),
-//         },
-//     ];
-
-//     let payments = vec![];
-
-//     let expected_balances = vec![
-//         TestTokenAmount {
-//             token: USDC_TOKEN_ID.to_vec(),
-//             amount: rust_biguint!(USER_TOTAL_TOKENS + amount * 95 / 100),
-//         },
-//         TestTokenAmount {
-//             token: USDT_TOKEN_ID.to_vec(),
-//             amount: rust_biguint!(USER_TOTAL_TOKENS),
-//         },
-//         TestTokenAmount {
-//             token: WRAPPED_EGLD_TOKEN_ID.to_vec(),
-//             amount: rust_biguint!(USER_TOTAL_TOKENS),
-//         },
-//     ];
-//     check_result_egld(&mut agg_setup, rust_biguint!(1_000_000_000_000_000_000));
-//     aggregate_v2(
-//         &mut agg_setup,
-//         test_steps,
-//         test_limits,
-//         rust_biguint!(amount),
-//         payments,
-//         true,
-//         OptionalValue::None,
-//     )
-//     .assert_ok();
-//     check_result(&mut agg_setup, expected_balances);
-//     check_result_egld(
-//         &mut agg_setup,
-//         rust_biguint!(1_000_000_000_000_000_000 - amount),
-//     )
-// }
+    aggregate(
+        &mut agg_setup,
+        b"EGLD",
+        BUSD_TOKEN_ID,
+        test_steps, 
+        rust_biguint!(0), 
+        Option::None,
+        TxTokenTransfer {
+            token_identifier: b"EGLD".to_vec(),
+            nonce: 0,
+            value: rust_biguint!(amount),
+        }
+    ).assert_ok();
+    check_result(&mut agg_setup, expected_balances);
+    check_result_egld(&mut agg_setup, rust_biguint!(1_000_000_000_000_000_000 - amount));
+}
 
 #[test]
-fn test_aggregate_error() {
+fn test_aggregate_simple_return_egld() {
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+        fee::contract_obj,
+    );
+    let mock_address = agg_setup.mock_wrapper.address_ref().clone();
+    let amount = 1_000_000;
+
+    let test_steps = vec![TestAggregatorStep {
+        token_in: BUSD_TOKEN_ID.to_vec(),
+        token_out: b"EGLD".to_vec(),
+        amount_in: rust_biguint!(amount),
+        pool_address: mock_address.clone(),
+    }];
+
+    let expected_balances = vec![
+        TestTokenAmount {
+            token: BUSD_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(USER_TOTAL_TOKENS - amount),
+        },
+    ];
+
+    aggregate(
+        &mut agg_setup,
+        BUSD_TOKEN_ID,
+        b"EGLD",
+        test_steps, 
+        rust_biguint!(0), 
+        Option::None,
+        TxTokenTransfer {
+            token_identifier: BUSD_TOKEN_ID.to_vec(),
+            nonce: 0,
+            value: rust_biguint!(amount),
+        }
+    ).assert_ok();
+    check_result(&mut agg_setup, expected_balances);
+    check_result_egld(&mut agg_setup, rust_biguint!(1_000_000_000_000_000_000 + amount * 95 / 100));
+}
+
+#[test]
+fn test_aggregate_simple_egld_in_step() {
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+        fee::contract_obj,
+    );
+    let mock_address = agg_setup.mock_wrapper.address_ref().clone();
+    let amount = 1_000_000;
+
+    let test_steps = vec![TestAggregatorStep {
+        token_in: BUSD_TOKEN_ID.to_vec(),
+        token_out: b"EGLD".to_vec(),
+        amount_in: rust_biguint!(amount),
+        pool_address: mock_address.clone(),
+    }, TestAggregatorStep {
+        token_in: b"EGLD".to_vec(),
+        token_out: USDC_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(0),
+        pool_address: mock_address.clone(),
+    }];
+
+    let expected_balances = vec![
+        TestTokenAmount {
+            token: BUSD_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(USER_TOTAL_TOKENS - amount),
+        },
+        TestTokenAmount {
+            token: USDC_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(USER_TOTAL_TOKENS + amount * 95 / 100 * 95 / 100),
+        },
+    ];
+
+    aggregate(
+        &mut agg_setup,
+        BUSD_TOKEN_ID,
+        USDC_TOKEN_ID,
+        test_steps, 
+        rust_biguint!(0), 
+        Option::None,
+        TxTokenTransfer {
+            token_identifier: BUSD_TOKEN_ID.to_vec(),
+            nonce: 0,
+            value: rust_biguint!(amount),
+        }
+    ).assert_ok();
+    check_result(&mut agg_setup, expected_balances);
+    check_result_egld(&mut agg_setup, rust_biguint!(1_000_000_000_000_000_000));
+}
+
+#[test]
+fn test_aggregate_two_routes() {
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+        fee::contract_obj,
+    );
+    let mock_address = agg_setup.mock_wrapper.address_ref().clone();
+    let amount = 1_000_000;
+
+    let test_steps = vec![TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(),
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount),
+        pool_address: mock_address.clone(),
+    }, TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(),
+        token_out: USDT_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount),
+        pool_address: mock_address.clone(),
+    }, TestAggregatorStep {
+        token_in: USDT_TOKEN_ID.to_vec(),
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(0),
+        pool_address: mock_address.clone(),
+    }];
+
+    let expected_balances = vec![
+        TestTokenAmount {
+            token: USDC_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(USER_TOTAL_TOKENS - 2 * amount),
+        },
+        TestTokenAmount {
+            token: USDT_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(USER_TOTAL_TOKENS),
+        },
+        TestTokenAmount {
+            token: BUSD_TOKEN_ID.to_vec(),
+            amount: rust_biguint!(USER_TOTAL_TOKENS + amount * 95 / 100 + amount * 95 / 100 * 95 / 100),
+        },
+    ];
+
+    aggregate(
+        &mut agg_setup,
+        USDC_TOKEN_ID,
+        BUSD_TOKEN_ID,
+        test_steps, 
+        rust_biguint!(0), 
+        Option::None,
+        TxTokenTransfer {
+            token_identifier: USDC_TOKEN_ID.to_vec(),
+            nonce: 0,
+            value: rust_biguint!(2 * amount),
+        }
+    ).assert_ok();
+    check_result(&mut agg_setup, expected_balances);
+}
+
+#[test]
+fn test_aggregate_error_invalid_token_in() {
     let mut agg_setup = setup_aggregator(
         protocol_mock::contract_obj,
         wrapper_mock::contract_obj,
@@ -559,6 +578,297 @@ fn test_aggregate_error() {
         Option::None, 
         payment
     ).assert_user_error(ERROR_INVALID_TOKEN_IN);
+}
+
+#[test]
+fn test_aggregate_error_same_token() {
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+        fee::contract_obj,
+    );
+    let mock_address = agg_setup.mock_wrapper.address_ref().clone();
+    let amount = 1_000_000;
+
+    // invalid token in
+    let test_steps = vec![TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(),
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount),
+        pool_address: mock_address.clone(),
+    }];
+
+    let payment = TxTokenTransfer {
+        token_identifier: USDC_TOKEN_ID.to_vec(), // change it
+        nonce: 0,
+        value: rust_biguint!(amount),
+    };
+
+    aggregate(
+        &mut agg_setup, 
+        USDC_TOKEN_ID, 
+        USDC_TOKEN_ID, 
+        test_steps, 
+        rust_biguint!(0), 
+        Option::None, 
+        payment
+    ).assert_user_error(ERROR_SAME_TOKEN);
+}
+
+#[test]
+fn test_aggregate_error_same_token_in_step() {
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+        fee::contract_obj,
+    );
+    let mock_address = agg_setup.mock_wrapper.address_ref().clone();
+    let amount = 1_000_000;
+
+    let test_steps = vec![TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(),
+        token_out: USDC_TOKEN_ID.to_vec(), // invalid same token
+        amount_in: rust_biguint!(amount),
+        pool_address: mock_address.clone(),
+    }];
+
+    let payment = TxTokenTransfer {
+        token_identifier: USDC_TOKEN_ID.to_vec(),
+        nonce: 0,
+        value: rust_biguint!(amount),
+    };
+
+    aggregate(
+        &mut agg_setup, 
+        USDC_TOKEN_ID,
+        BUSD_TOKEN_ID, 
+        test_steps, 
+        rust_biguint!(0), 
+        Option::None, 
+        payment
+    ).assert_user_error(ERROR_SAME_TOKEN);
+}
+
+#[test]
+fn test_aggregate_error_invalid_address() {
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+        fee::contract_obj,
+    );
+    let agg_address: Address = agg_setup.agg_wrapper.address_ref().clone();
+    let amount = 1_000_000;
+
+    // invalid token in
+    let test_steps = vec![TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(),
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount),
+        pool_address: agg_address.clone(), //same addr as aggregator
+    }];
+
+    let payment = TxTokenTransfer {
+        token_identifier: USDC_TOKEN_ID.to_vec(),
+        nonce: 0,
+        value: rust_biguint!(amount),
+    };
+
+    aggregate(
+        &mut agg_setup, 
+        USDC_TOKEN_ID, 
+        BUSD_TOKEN_ID, 
+        test_steps, 
+        rust_biguint!(0), 
+        Option::None, 
+        payment
+    ).assert_user_error(ERROR_INVALID_POOL_ADDR);
+}
+
+#[test]
+fn test_aggregate_error_two_routes_invalid_token_out() {
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+        fee::contract_obj,
+    );
+    let mock_address = agg_setup.mock_wrapper.address_ref().clone();
+    let amount = 1_000_000;
+
+    let test_steps = vec![TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(),
+        token_out: USDT_TOKEN_ID.to_vec(), // invalid token out
+        amount_in: rust_biguint!(amount),
+        pool_address: mock_address.clone(),
+    }, TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(),
+        token_out: USDT_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount),
+        pool_address: mock_address.clone(),
+    }, TestAggregatorStep {
+        token_in: USDT_TOKEN_ID.to_vec(),
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(0),
+        pool_address: mock_address.clone(),
+    }];
+
+    aggregate(
+        &mut agg_setup,
+        USDC_TOKEN_ID,
+        BUSD_TOKEN_ID,
+        test_steps, 
+        rust_biguint!(0), 
+        Option::None,
+        TxTokenTransfer {
+            token_identifier: USDC_TOKEN_ID.to_vec(),
+            nonce: 0,
+            value: rust_biguint!(2 * amount),
+        }
+    ).assert_user_error(ERROR_INVALID_TOKEN_OUT);
+}
+
+#[test]
+fn test_aggregate_error_two_routes_invalid_token_out_2() {
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+        fee::contract_obj,
+    );
+    let mock_address = agg_setup.mock_wrapper.address_ref().clone();
+    let amount = 1_000_000;
+
+    let test_steps = vec![TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(),
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount),
+        pool_address: mock_address.clone(),
+    }, TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(),
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount),
+        pool_address: mock_address.clone(),
+    }, TestAggregatorStep {
+        token_in: BUSD_TOKEN_ID.to_vec(),
+        token_out: USDT_TOKEN_ID.to_vec(), // invalid token out
+        amount_in: rust_biguint!(0),
+        pool_address: mock_address.clone(),
+    }];
+
+    aggregate(
+        &mut agg_setup,
+        USDC_TOKEN_ID,
+        BUSD_TOKEN_ID,
+        test_steps, 
+        rust_biguint!(0), 
+        Option::None,
+        TxTokenTransfer {
+            token_identifier: USDC_TOKEN_ID.to_vec(),
+            nonce: 0,
+            value: rust_biguint!(2 * amount),
+        }
+    ).assert_user_error(ERROR_INVALID_TOKEN_OUT);
+}
+
+#[test]
+fn test_aggregate_error_two_routes_invalid_token_in_step() {
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+        fee::contract_obj,
+    );
+    let mock_address = agg_setup.mock_wrapper.address_ref().clone();
+    let amount = 1_000_000;
+
+    let test_steps = vec![TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(),
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount),
+        pool_address: mock_address.clone(),
+    }, TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(),
+        token_out: USDT_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount),
+        pool_address: mock_address.clone(),
+    }, TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(), // invalid token in step
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(0),
+        pool_address: mock_address.clone(),
+    }];
+
+    aggregate(
+        &mut agg_setup,
+        USDC_TOKEN_ID,
+        BUSD_TOKEN_ID,
+        test_steps, 
+        rust_biguint!(0), 
+        Option::None,
+        TxTokenTransfer {
+            token_identifier: USDC_TOKEN_ID.to_vec(),
+            nonce: 0,
+            value: rust_biguint!(2 * amount),
+        }
+    ).assert_user_error(ERROR_INVALID_TOKEN_IN);
+}
+
+#[test]
+fn test_aggregate_error_two_routes_invalid_amount_in_step() {
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+        fee::contract_obj,
+    );
+    let mock_address = agg_setup.mock_wrapper.address_ref().clone();
+    let amount = 1_000_000;
+
+    let test_steps = vec![TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(),
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount - 1), // invalid amount in
+        pool_address: mock_address.clone(),
+    }, TestAggregatorStep {
+        token_in: USDC_TOKEN_ID.to_vec(),
+        token_out: USDT_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(amount),
+        pool_address: mock_address.clone(),
+    }, TestAggregatorStep {
+        token_in: USDT_TOKEN_ID.to_vec(),
+        token_out: BUSD_TOKEN_ID.to_vec(),
+        amount_in: rust_biguint!(0),
+        pool_address: mock_address.clone(),
+    }];
+
+    aggregate(
+        &mut agg_setup,
+        USDC_TOKEN_ID,
+        BUSD_TOKEN_ID,
+        test_steps, 
+        rust_biguint!(0), 
+        Option::None,
+        TxTokenTransfer {
+            token_identifier: USDC_TOKEN_ID.to_vec(),
+            nonce: 0,
+            value: rust_biguint!(2 * amount),
+        }
+    ).assert_user_error(ERROR_INVALID_STEPS);
+}
+
+#[test]
+fn test_aggregate_error_invalid_amount_in() {
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+        fee::contract_obj,
+    );
+    let mock_address = agg_setup.mock_wrapper.address_ref().clone();
+    let amount = 1_000_000;
 
     // invalid amount in
     let test_steps = vec![TestAggregatorStep {
@@ -583,7 +893,18 @@ fn test_aggregate_error() {
         payment
     )
     .assert_user_error(ERROR_INVALID_AMOUNT_IN);
+}
 
+#[test]
+fn test_aggregate_error_slippage_screw_you() {
+    let mut agg_setup = setup_aggregator(
+        protocol_mock::contract_obj,
+        wrapper_mock::contract_obj,
+        aggregator::contract_obj,
+        fee::contract_obj,
+    );
+    let mock_address = agg_setup.mock_wrapper.address_ref().clone();
+    let amount = 1_000_000;
     // slippage
     let test_steps = vec![TestAggregatorStep {
         token_in: USDC_TOKEN_ID.to_vec(),
@@ -591,17 +912,6 @@ fn test_aggregate_error() {
         amount_in: rust_biguint!(amount),
         pool_address: mock_address.clone(),
     }];
-
-    let test_limits = vec![
-        TestTokenAmount {
-            token: USDC_TOKEN_ID.to_vec(),
-            amount: rust_biguint!(amount),
-        },
-        TestTokenAmount {
-            token: BUSD_TOKEN_ID.to_vec(),
-            amount: rust_biguint!(amount),
-        },
-    ];
 
     let payment = TxTokenTransfer {
         token_identifier: USDC_TOKEN_ID.to_vec(),
