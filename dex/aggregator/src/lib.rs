@@ -23,6 +23,9 @@ pub trait AggregatorContract: token_send::TokenSendModule {
         self.egld_wrapped_token_id().set(egld_wrapped_token_id);
     }
 
+    #[endpoint(upgrade)]
+    fn upgrade(&self) {}
+
     fn _find_token_in_vault(&self, tokens: &ManagedVec<TokenAmount<Self::Api>>, token_id: &TokenIdentifier) -> Option<usize> {
         for (index, token) in tokens.into_iter().enumerate() {
             if token_id == &token.token { return Some(index); }
@@ -316,5 +319,10 @@ pub trait AggregatorContract: token_send::TokenSendModule {
             payments.push(EsdtTokenPayment::new(token, 0, fee_amount));
         }
         self.send_multiple_tokens_if_not_zero(&self.ashswap_fee_address().get(), &payments);
+    }
+
+    #[endpoint(claimEgld)]
+    fn claim_egld(&self) {
+        self.send().direct_egld(&self.ashswap_fee_address().get(), &self.blockchain().get_sc_balance(&EgldOrEsdtTokenIdentifier::egld(), 0));
     }
 }
