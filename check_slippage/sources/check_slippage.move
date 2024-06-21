@@ -16,4 +16,8 @@ module check_slippage::check_slippage {
         assert!(expect_coin_type == coin_type, EInvalidCoin);
         assert!(coin::value(result) >= amount_out_min, ESlippage);
     }
+
+    public fun cut_remainder(arg0: u64, arg1: u64) : u64 {
+        arg1 - arg1 % arg0
+    }
 }
