@@ -12,15 +12,8 @@ pub struct OnedexView<M: ManagedTypeApi> {
     pub reserve_0: BigUint<M>,
     pub reserve_1: BigUint<M>,
     pub address: ManagedAddress<M>,
-    pub token_id_0: TokenIdentifier<M>,
-    pub token_id_1: TokenIdentifier<M>,
-}
-
-#[derive(TopEncode, TopDecode, NestedEncode, NestedDecode, PartialEq, TypeAbi, Clone, ManagedVecItem)]
-pub struct OnedexViewRequest<M: ManagedTypeApi> {
-    pub pool_address: ManagedAddress<M>,
-    pub token_id_0: TokenIdentifier<M>,
-    pub token_id_1: TokenIdentifier<M>,
+    pub token_0_id: TokenIdentifier<M>,
+    pub token_1_id: TokenIdentifier<M>,
 }
 
 #[multiversx_sc::module]
@@ -30,20 +23,19 @@ pub trait WrapperModule {
 
     #[view(getOnedex)]
     fn get_onedex(&self, pool_address: ManagedAddress) -> MultiValueEncoded<OnedexView<Self::Api>> {
-        let mut result = MultiValueEncoded::new();
         let pairs: MultiValueEncoded<OnedexPool<Self::Api>> = self.proxy(pool_address.clone()).view_pairs().execute_on_dest_context();
-        let total_fee: BigUint = self.proxy(pool_address.clone()).get_total_fee_percent().execute_on_dest_context();
+
+        let mut result = MultiValueEncoded::new();
         for pair in pairs.into_iter() {
-            let view = OnedexView {
-                status: pair.status,
-                total_fee: total_fee.clone(),
-                reserve_0: pair.reserve_0,
-                reserve_1: pair.reserve_1,
+            result.push(OnedexView {
+                status: pair.state,
+                total_fee: BigUint::from(pair.total_fee_percentage),
+                reserve_0: pair.first_token_reserve,
+                reserve_1: pair.second_token_reserve,
                 address: pool_address.clone(),
-                token_id_0: pair.token_id_0.clone(),
-                token_id_1: pair.token_id_1.clone(),
-            };
-            result.push(view);
+                token_0_id: pair.first_token_id,
+                token_1_id: pair.second_token_id,
+            });
         }
         result
     }
